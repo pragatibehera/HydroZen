@@ -1,0 +1,258 @@
+/*
+  # Initial Schema Setup for HydroZen
+
+  1. User Profiles
+    - Extended user profile information
+    - Gamification data
+    - Preferences
+  
+  2. Water Usage
+    - Daily water consumption records
+    - Usage categories
+    - Historical data
+  
+  3. Achievements
+    - Achievement definitions
+    - User achievements
+    
+  4. Leakage Reports
+    - User submitted reports
+    - AI verification status
+    - Points awarded
+    
+  5. Community Features
+    - Leaderboard data
+    - Community challenges
+*/
+
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- User Profiles
+CREATE TABLE IF NOT EXISTS profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id),
+  username TEXT UNIQUE,
+  full_name TEXT,
+  avatar_url TEXT,
+  points INTEGER DEFAULT 0,
+  level INTEGER DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Water Usage Records
+CREATE TABLE IF NOT EXISTS water_usage (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES profiles(id),
+  category TEXT NOT NULL,
+  amount DECIMAL NOT NULL,
+  timestamp TIMESTAMPTZ DEFAULT now(),
+  notes TEXT
+);
+
+-- Achievements
+CREATE TABLE IF NOT EXISTS achievements (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  points INTEGER NOT NULL,
+  icon TEXT,
+  category TEXT NOT NULL
+);
+
+-- User Achievements
+CREATE TABLE IF NOT EXISTS user_achievements (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES profiles(id),
+  achievement_id UUID REFERENCES achievements(id),
+  earned_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, achievement_id)
+);
+
+-- Leakage Reports
+CREATE TABLE IF NOT EXISTS leakage_reports (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES profiles(id),
+  location TEXT NOT NULL,
+  description TEXT NOT NULL,
+  severity TEXT NOT NULL,
+  status TEXT DEFAULT 'pending',
+  verified BOOLEAN DEFAULT false,
+  points_awarded INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Community Challenges
+CREATE TABLE IF NOT EXISTS community_challenges (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  start_date TIMESTAMPTZ NOT NULL,
+  end_date TIMESTAMPTZ NOT NULL,
+  points INTEGER NOT NULL,
+  status TEXT DEFAULT 'active'
+);
+
+-- Challenge Participants
+CREATE TABLE IF NOT EXISTS challenge_participants (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  challenge_id UUID REFERENCES community_challenges(id),
+  user_id UUID REFERENCES profiles(id),
+  joined_at TIMESTAMPTZ DEFAULT now(),
+  completed_at TIMESTAMPTZ,
+  points_earned INTEGER DEFAULT 0,
+  UNIQUE(challenge_id, user_id)
+);
+
+-- Enable Row Level Security
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE water_usage ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_achievements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE leakage_reports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE challenge_participants ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+CREATE POLICY "Users can read own profile"
+  ON profiles FOR SELECT
+  TO authenticated
+  USING (auth.uid() = id);
+
+CREATE POLICY "Users can update own profile"
+  ON profiles FOR UPDATE
+  TO authenticated
+  USING (auth.uid() = id);
+
+CREATE POLICY "Users can read own water usage"
+  ON water_usage FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Users can insert own water usage"
+  ON water_usage FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can read own achievements"
+  ON user_achievements FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Users can read own leakage reports"
+  ON leakage_reports FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Users can create leakage reports"
+  ON leakage_reports FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+-- Functions
+CREATE OR REPLACE FUNCTION update_points()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE profiles
+  SET points = points + NEW.points_awarded
+  WHERE id = NEW.user_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Triggers
+CREATE TRIGGER update_user_points
+AFTER INSERT ON user_achievements
+FOR EACH ROW
+EXECUTE FUNCTION update_points();
+
+CREATE TRIGGER update_leakage_points
+AFTER UPDATE OF points_awarded ON leakage_reports
+FOR EACH ROW
+WHEN (OLD.points_awarded IS DISTINCT FROM NEW.points_awarded)
+EXECUTE FUNCTION update_points();
+
+
+/*
+  # Add Realtime Features and Points System
+
+  1. Points Transactions
+    - Track all point changes
+    - Enable real-time updates
+  
+  2. Community Stats Function
+    - Aggregate community statistics
+    - Real-time leaderboard data
+*/
+
+-- Points Transactions Table
+CREATE TABLE IF NOT EXISTS points_transactions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES profiles(id),
+  points INTEGER NOT NULL,
+  reason TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Enable RLS
+ALTER TABLE points_transactions ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+CREATE POLICY "Users can view own transactions"
+  ON points_transactions FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+-- Community Stats Function
+CREATE OR REPLACE FUNCTION get_community_stats()
+RETURNS TABLE (
+  total_users INTEGER,
+  total_water_saved DECIMAL,
+  total_leaks_reported INTEGER,
+  total_challenges_completed INTEGER,
+  top_savers JSON
+) LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    (SELECT COUNT(*) FROM profiles)::INTEGER as total_users,
+    COALESCE((SELECT SUM(amount) FROM water_usage), 0) as total_water_saved,
+    (SELECT COUNT(*) FROM leakage_reports WHERE verified = true)::INTEGER as total_leaks_reported,
+    (SELECT COUNT(*) FROM challenge_participants WHERE completed_at IS NOT NULL)::INTEGER as total_challenges_completed,
+    (
+      SELECT json_agg(row_to_json(t))
+      FROM (
+        SELECT p.username, p.points, p.level
+        FROM profiles p
+        ORDER BY p.points DESC
+        LIMIT 5
+      ) t
+    ) as top_savers;
+END;
+$$;
+
+-- Points Update Trigger Function
+CREATE OR REPLACE FUNCTION notify_points_update()
+RETURNS TRIGGER AS $$
+BEGIN
+  PERFORM pg_notify(
+    'points_update',
+    json_build_object(
+      'user_id', NEW.user_id,
+      'points', NEW.points,
+      'reason', NEW.reason
+    )::text
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create Trigger
+CREATE TRIGGER points_update_trigger
+AFTER INSERT ON points_transactions
+FOR EACH ROW
+EXECUTE FUNCTION notify_points_update();
+
+-- Add Realtime Replication
+ALTER PUBLICATION supabase_realtime ADD TABLE points_transactions;
+ALTER PUBLICATION supabase_realtime ADD TABLE challenge_participants;
+ALTER PUBLICATION supabase_realtime ADD TABLE profiles;
