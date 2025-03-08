@@ -1,75 +1,68 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Trophy } from "lucide-react";
 
-export function LeaderboardWidget() {
-  const leaderboardData = [
-    {
-      name: "Alex Johnson",
-      points: 1250,
-      avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop",
-      rank: 1,
-      badge: "Water Guardian"
-    },
-    {
-      name: "Sarah Chen",
-      points: 980,
-      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=100&auto=format&fit=crop",
-      rank: 2,
-      badge: "Leak Hunter"
-    },
-    {
-      name: "Miguel Rodriguez",
-      points: 845,
-      avatar: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=100&auto=format&fit=crop",
-      rank: 3,
-      badge: "Conservation Pro"
-    },
-    {
-      name: "You",
-      points: 320,
-      avatar: "",
-      rank: 12,
-      badge: "Rising Star"
-    }
-  ];
+interface LeaderboardEntry {
+  id: number;
+  user_name: string;
+  water_saved: number;
+  rank: number;
+}
 
+interface LeaderboardWidgetProps {
+  data: LeaderboardEntry[];
+}
+
+export function LeaderboardWidget({ data }: LeaderboardWidgetProps) {
   return (
-    <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg">Conservation Leaderboard</CardTitle>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Trophy className="h-5 w-5 text-yellow-500" />
+          Water Saving Leaders
+        </CardTitle>
+        <CardDescription>Top water conservers this month</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {leaderboardData.map((user, index) => (
-            <div 
-              key={index} 
-              className={`flex items-center justify-between p-2 rounded-lg ${
-                user.name === "You" 
-                  ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800" 
-                  : ""
-              }`}
+          {data.map((entry) => (
+            <div
+              key={entry.id}
+              className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-4 last:border-0 last:pb-0"
             >
               <div className="flex items-center gap-3">
-                <div className="flex-shrink-0 w-8 text-center font-medium text-gray-500">
-                  #{user.rank}
+                <div
+                  className={`
+                  w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
+                  ${
+                    entry.rank === 1
+                      ? "bg-yellow-100 text-yellow-700"
+                      : entry.rank === 2
+                      ? "bg-gray-100 text-gray-700"
+                      : entry.rank === 3
+                      ? "bg-orange-100 text-orange-700"
+                      : "bg-blue-50 text-blue-700"
+                  }
+                `}
+                >
+                  {entry.rank}
                 </div>
-                <Avatar>
-                  <AvatarImage src={user.avatar} />
-                  <AvatarFallback className="bg-blue-100 text-blue-800">
-                    {user.name.split(' ').map(n => n[0]).join('')}
-                  </AvatarFallback>
-                </Avatar>
                 <div>
-                  <div className="font-medium">{user.name}</div>
-                  <Badge variant="outline" className="text-xs font-normal">
-                    {user.badge}
-                  </Badge>
+                  <p className="font-medium text-gray-900 dark:text-white">
+                    {entry.user_name}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {entry.water_saved.toFixed(1)}L saved
+                  </p>
                 </div>
               </div>
-              <div className="font-semibold">{user.points} pts</div>
             </div>
           ))}
         </div>

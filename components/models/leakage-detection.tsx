@@ -31,6 +31,8 @@ import { supabase } from "@/lib/supabase";
 import { useUser } from "@supabase/auth-helpers-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { database } from "@/lib/firebase";
+import { ref, onValue, off } from "firebase/database";
 
 interface RecentLeak {
   id: string;
@@ -51,6 +53,10 @@ interface UserContribution {
   verification_rate: number;
 }
 
+interface NodeData {
+  flow_rate: number;
+}
+
 export function LeakageDetection() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [recentLeaks, setRecentLeaks] = useState<RecentLeak[]>([]);
@@ -63,6 +69,23 @@ export function LeakageDetection() {
   const [loading, setLoading] = useState(true);
   const user = useUser();
   const { toast } = useToast();
+  const [node1Data, setNode1Data] = useState<NodeData | null>(null);
+  const [node2Data, setNode2Data] = useState<NodeData | null>(null);
+  const [nodeLoading, setNodeLoading] = useState(true);
+  const [alerts, setAlerts] = useState<
+    {
+      type: "leak" | "system";
+      severity: "low" | "medium" | "high";
+      location: string;
+      message: string;
+    }[]
+  >([]);
+
+  // Add this helper function
+  const formatFlowRate = (value: number | undefined | null): string => {
+    if (typeof value !== "number") return "0.00";
+    return value.toFixed(2);
+  };
 
   useEffect(() => {
     async function fetchDashboardData() {
@@ -175,6 +198,85 @@ export function LeakageDetection() {
     fetchDashboardData();
   }, [user, toast]);
 
+  // Add Firebase listener for nodes
+  useEffect(() => {
+    const node1Ref = ref(
+      database,
+      "TransferredFeatures/-OKquAGqOgeRz1qYqMKY/features"
+    );
+    const node2Ref = ref(
+      database,
+      "TransferredFeatures/-OKquAGqOgeRz1qYqMKY/features2"
+    );
+
+    onValue(node1Ref, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setNode1Data(data);
+      }
+    });
+
+    onValue(node2Ref, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setNode2Data(data);
+      }
+    });
+
+    setNodeLoading(false);
+
+    return () => {
+      off(node1Ref);
+      off(node2Ref);
+    };
+  }, []);
+
+  // Update node comparison logic
+  useEffect(() => {
+    if (!node1Data?.flow_rate || !node2Data?.flow_rate) return;
+
+    const flowDiff = Math.abs(node1Data.flow_rate - node2Data.flow_rate);
+    const flowThreshold = 10; // L/min threshold for leak detection
+
+    const newAlerts: {
+      type: "leak" | "system";
+      severity: "low" | "medium" | "high";
+      location: string;
+      message: string;
+    }[] = [];
+
+    if (flowDiff > flowThreshold) {
+      const severity: "low" | "medium" | "high" =
+        flowDiff > 30 ? "high" : flowDiff > 20 ? "medium" : "low";
+
+      const higherFlowNode =
+        node1Data.flow_rate > node2Data.flow_rate ? "Location 1" : "Location 2";
+
+      newAlerts.push({
+        type: "leak",
+        severity,
+        location: higherFlowNode,
+        message: `Significant flow difference detected (${formatFlowRate(
+          flowDiff
+        )} L/min). Possible leak at ${higherFlowNode}.`,
+      });
+
+      // Add high flow alert if either node exceeds normal range
+      if (node1Data.flow_rate > 100 || node2Data.flow_rate > 100) {
+        newAlerts.push({
+          type: "system",
+          severity: "medium",
+          location: node1Data.flow_rate > 100 ? "Location 1" : "Location 2",
+          message: `Abnormally high flow rate detected (${formatFlowRate(
+            Math.max(node1Data.flow_rate, node2Data.flow_rate)
+          )} L/min)`,
+        });
+      }
+    }
+
+    setAlerts(newAlerts);
+  }, [node1Data?.flow_rate, node2Data?.flow_rate]);
+
   // Show loading state
   if (loading) {
     return (
@@ -252,6 +354,110 @@ export function LeakageDetection() {
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            {/* Node 1 Card */}
+            <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-lg">Location 1 Node</CardTitle>
+                <CardDescription>Real-time sensor readings</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {nodeLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                  </div>
+                ) : node1Data?.flow_rate !== undefined ? (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-500">Flow Rate</span>
+                      <span className="font-medium">
+                        {formatFlowRate(node1Data.flow_rate)} L/min
+                      </span>
+                    </div>
+                    <div className="mt-4">
+                      <div className="flex justify-between text-sm mb-1">
+                        <span>Flow Status</span>
+                        <span
+                          className={
+                            (node1Data.flow_rate ?? 0) > 100
+                              ? "text-yellow-500"
+                              : "text-green-500"
+                          }
+                        >
+                          {(node1Data.flow_rate ?? 0) > 100
+                            ? "High Flow"
+                            : "Normal"}
+                        </span>
+                      </div>
+                      <Progress
+                        value={Math.min(
+                          ((node1Data.flow_rate ?? 0) / 150) * 100,
+                          100
+                        )}
+                        className="h-2"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center text-gray-500">
+                    No data available
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Node 2 Card */}
+            <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-lg">Location 2 Node</CardTitle>
+                <CardDescription>Real-time sensor readings</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {nodeLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                  </div>
+                ) : node2Data?.flow_rate !== undefined ? (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-500">Flow Rate</span>
+                      <span className="font-medium">
+                        {formatFlowRate(node2Data.flow_rate)} L/min
+                      </span>
+                    </div>
+                    <div className="mt-4">
+                      <div className="flex justify-between text-sm mb-1">
+                        <span>Flow Status</span>
+                        <span
+                          className={
+                            (node2Data.flow_rate ?? 0) > 100
+                              ? "text-yellow-500"
+                              : "text-green-500"
+                          }
+                        >
+                          {(node2Data.flow_rate ?? 0) > 100
+                            ? "High Flow"
+                            : "Normal"}
+                        </span>
+                      </div>
+                      <Progress
+                        value={Math.min(
+                          ((node2Data.flow_rate ?? 0) / 150) * 100,
+                          100
+                        )}
+                        className="h-2"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center text-gray-500">
+                    No data available
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
               <CardHeader className="pb-2">
@@ -311,54 +517,88 @@ export function LeakageDetection() {
                 <CardTitle className="text-lg">Current Alerts</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                  <div className="flex gap-2 text-yellow-700 dark:text-yellow-500">
-                    <AlertTriangle className="h-5 w-5 flex-shrink-0" />
-                    <div className="text-sm">
-                      <p className="font-medium">Potential Leak Detected</p>
-                      <p className="mt-1">
-                        Flow discrepancy in Sector 7, Block B. Verification
-                        needed.
-                      </p>
-                      <div className="mt-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-xs"
-                        >
-                          Verify
-                        </Button>
+                {alerts.length === 0 ? (
+                  <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                    <div className="flex gap-2 text-green-700 dark:text-green-500">
+                      <CheckCircle className="h-5 w-5 flex-shrink-0" />
+                      <div className="text-sm">
+                        <p className="font-medium">All Systems Normal</p>
+                        <p className="mt-1">
+                          No leakage detected between nodes
+                        </p>
                       </div>
                     </div>
                   </div>
-                </div>
-
-                <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                  <div className="flex gap-2 text-red-700 dark:text-red-500">
-                    <AlertTriangle className="h-5 w-5 flex-shrink-0" />
-                    <div className="text-sm">
-                      <p className="font-medium">Confirmed Leak</p>
-                      <p className="mt-1">
-                        Main Street Pipeline showing significant water loss.
-                        Maintenance team dispatched.
-                      </p>
-                      <div className="mt-2 flex gap-2">
-                        <Badge
-                          variant="outline"
-                          className="text-xs border-red-200 dark:border-red-800"
-                        >
-                          High Priority
-                        </Badge>
-                        <Badge
-                          variant="outline"
-                          className="text-xs border-yellow-200 dark:border-yellow-800"
-                        >
-                          In Progress
-                        </Badge>
+                ) : (
+                  alerts.map((alert, index) => (
+                    <div
+                      key={index}
+                      className={`p-3 rounded-lg border ${
+                        alert.severity === "high"
+                          ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
+                          : alert.severity === "medium"
+                          ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800"
+                          : "bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800"
+                      }`}
+                    >
+                      <div
+                        className={`flex gap-2 ${
+                          alert.severity === "high"
+                            ? "text-red-700 dark:text-red-500"
+                            : alert.severity === "medium"
+                            ? "text-yellow-700 dark:text-yellow-500"
+                            : "text-orange-700 dark:text-orange-500"
+                        }`}
+                      >
+                        <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+                        <div className="text-sm">
+                          <p className="font-medium">
+                            {alert.severity === "high"
+                              ? "Critical Alert"
+                              : "Potential Leak Detected"}
+                          </p>
+                          <p className="mt-1">{alert.message}</p>
+                          <div className="mt-2 flex gap-2">
+                            <Badge
+                              variant="outline"
+                              className={`text-xs ${
+                                alert.severity === "high"
+                                  ? "border-red-200 dark:border-red-800"
+                                  : alert.severity === "medium"
+                                  ? "border-yellow-200 dark:border-yellow-800"
+                                  : "border-orange-200 dark:border-orange-800"
+                              }`}
+                            >
+                              {alert.severity.toUpperCase()} Priority
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className="text-xs border-blue-200 dark:border-blue-800"
+                            >
+                              {alert.location}
+                            </Badge>
+                          </div>
+                          <div className="mt-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs"
+                              onClick={() => {
+                                // Handle verification or investigation
+                                toast({
+                                  title: "Investigation Initiated",
+                                  description: `Maintenance team notified about the issue at ${alert.location}`,
+                                });
+                              }}
+                            >
+                              Investigate
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
+                  ))
+                )}
               </CardContent>
             </Card>
 

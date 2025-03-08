@@ -9,7 +9,7 @@ import { verifyLeakageImage } from "@/lib/gemini";
 import { addPointsForLeakage } from "@/lib/points";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@supabase/auth-helpers-react";
-import { Loader2, Upload } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 export function LeakageVerification() {
   const [isLoading, setIsLoading] = useState(false);
@@ -26,13 +26,14 @@ export function LeakageVerification() {
       if (!file.type.startsWith("image/")) {
         toast({
           title: "Invalid file type",
-          description: "Please select an image file (JPG, PNG, etc.)",
+          description: "Please select an image file",
           variant: "destructive",
         });
         return;
       }
 
       if (file.size > 5 * 1024 * 1024) {
+        // 5MB limit
         toast({
           title: "File too large",
           description: "Please select an image under 5MB",
@@ -54,38 +55,35 @@ export function LeakageVerification() {
 
     try {
       setIsLoading(true);
-      setUploadStatus("Uploading image to secure storage...");
+      setUploadStatus("Uploading image...");
 
       // Upload image to Firebase
       const imageUrl = await uploadImage(selectedImage);
-      console.log("Firebase image URL:", imageUrl);
+      console.log("Image uploaded:", imageUrl);
+      setUploadStatus("Verifying image...");
 
-      setUploadStatus("Analyzing image with AI...");
-      // Verify image using AI
+      // Verify image using Gemini AI
       const verificationResult = await verifyLeakageImage(imageUrl);
       console.log("Verification result:", verificationResult);
 
-      // More lenient verification check
-      if (verificationResult.isLeakage && verificationResult.confidence > 0.3) {
-        setUploadStatus("Verified! Processing rewards...");
-        // Add points and create leakage report
+      if (verificationResult.isLeakage && verificationResult.confidence > 0.7) {
+        setUploadStatus("Adding points...");
+        // Add points to user's account
         await addPointsForLeakage(user.id, imageUrl, verificationResult);
 
         toast({
-          title: "Water-Related Issue Detected",
-          description:
-            "Thank you for your report! Points have been added to your account.",
+          title: "Leakage Verified!",
+          description: `${verificationResult.description}. Points have been added to your account!`,
         });
 
         // Clear the form
         setSelectedImage(null);
         setPreviewUrl(null);
+        setUploadStatus("");
       } else {
         toast({
-          title: "No Water Issues Detected",
-          description:
-            verificationResult.description ||
-            "The image doesn't show any clear signs of water-related issues. Please try another image.",
+          title: "Not a Valid Leakage",
+          description: verificationResult.description,
           variant: "destructive",
         });
       }
@@ -96,12 +94,11 @@ export function LeakageVerification() {
         description:
           error instanceof Error
             ? error.message
-            : "Failed to process the image. Please try again.",
+            : "Failed to process the image",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
-      setUploadStatus("");
     }
   };
 
@@ -118,48 +115,26 @@ export function LeakageVerification() {
   return (
     <Card className="p-6 max-w-md mx-auto">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg p-8 text-center">
-          <div className="mx-auto flex flex-col items-center">
-            <Upload className="h-10 w-10 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium mb-2">Upload Leak Photo</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              Take a clear photo of the water leakage
-            </p>
-            <Input
-              id="image"
-              type="file"
-              accept="image/*"
-              onChange={handleImageSelect}
-              disabled={isLoading}
-              className="hidden"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => document.getElementById("image")?.click()}
-              disabled={isLoading}
-            >
-              <Upload className="mr-2 h-4 w-4" /> Select Photo
-            </Button>
-          </div>
+        <div className="space-y-2">
+          <label htmlFor="image" className="block text-sm font-medium">
+            Upload Leakage Image
+          </label>
+          <Input
+            id="image"
+            type="file"
+            accept="image/*"
+            onChange={handleImageSelect}
+            disabled={isLoading}
+          />
         </div>
 
         {previewUrl && (
           <div className="mt-4">
-            <p className="text-sm font-medium mb-2">Preview:</p>
-            <div className="relative rounded-lg overflow-hidden">
-              <img
-                src={previewUrl}
-                alt="Preview"
-                className="max-w-full h-auto rounded-lg"
-              />
-            </div>
-          </div>
-        )}
-
-        {uploadStatus && (
-          <div className="text-sm text-blue-500 text-center animate-pulse">
-            {uploadStatus}
+            <img
+              src={previewUrl}
+              alt="Preview"
+              className="max-w-full h-auto rounded-lg"
+            />
           </div>
         )}
 
@@ -177,10 +152,6 @@ export function LeakageVerification() {
             "Verify Leakage"
           )}
         </Button>
-
-        <p className="text-xs text-gray-500 text-center">
-          Supported formats: JPG, PNG. Maximum size: 5MB
-        </p>
       </form>
     </Card>
   );

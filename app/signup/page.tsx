@@ -14,12 +14,13 @@ import {
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 
-export default function LoginPage() {
+export default function SignUpPage() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const { signIn } = useAuth();
+  const { signUp } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,9 +28,9 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await signIn(email, password);
+      await signUp(email, password, name);
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Failed to sign in");
+      setError(error instanceof Error ? error.message : "Failed to sign up");
     } finally {
       setLoading(false);
     }
@@ -39,11 +40,26 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
-          <CardDescription>Sign in to your account to continue</CardDescription>
+          <CardTitle className="text-2xl font-bold">
+            Create an account
+          </CardTitle>
+          <CardDescription>Enter your details to get started</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="name" className="block text-sm font-medium">
+                Name
+              </label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="Enter your name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
             <div className="space-y-2">
               <label htmlFor="email" className="block text-sm font-medium">
                 Email
@@ -64,7 +80,7 @@ export default function LoginPage() {
               <Input
                 id="password"
                 type="password"
-                placeholder="Enter your password"
+                placeholder="Create a password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -77,20 +93,17 @@ export default function LoginPage() {
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Signing in...
+                  Creating account...
                 </>
               ) : (
-                "Sign in"
+                "Sign up"
               )}
             </Button>
 
             <div className="text-center text-sm">
-              Don&apos;t have an account?{" "}
-              <Link
-                href="/signup"
-                className="text-blue-600 hover:text-blue-500"
-              >
-                Sign up
+              Already have an account?{" "}
+              <Link href="/login" className="text-blue-600 hover:text-blue-500">
+                Sign in
               </Link>
             </div>
           </form>

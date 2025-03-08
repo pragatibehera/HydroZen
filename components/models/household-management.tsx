@@ -1,75 +1,196 @@
 "use client";
 
-import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Home, BarChart2, AlertTriangle, CheckCircle, Settings, Calendar } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Home,
+  BarChart2,
+  Settings,
+  Droplet,
+  Activity,
+  Users,
+  Clock,
+  TrendingDown,
+  TrendingUp,
+  AlertTriangle,
+} from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+
+interface WaterQualityData {
+  tds: number;
+  quality: "Excellent" | "Good" | "Fair" | "Poor";
+  flowRate: number;
+  tankLevel: number;
+}
+
+interface UsagePattern {
+  hour: number;
+  usage: number;
+}
+
+interface MemberUsage {
+  memberId: string;
+  name: string;
+  dailyUsage: number;
+  monthlyUsage: number;
+  complianceRate: number;
+}
+
+interface UsageAlert {
+  type: "success" | "warning" | "danger";
+  message: string;
+}
+
+interface WaterUsage {
+  daily: number;
+  weekly: number;
+  monthly: number;
+  yearlyAverage: number;
+  lastUpdated: Date;
+}
 
 export function HouseholdManagement() {
-  const [activeTab, setActiveTab] = useState('overview');
-  
-  const usageData = [
-    {
-      id: 1,
-      area: "Kitchen",
-      dailyUsage: 85,
-      monthlyUsage: 2550,
-      limit: 3000,
-      status: "Good"
-    },
-    {
-      id: 2,
-      area: "Bathroom",
-      dailyUsage: 120,
-      monthlyUsage: 3600,
-      limit: 3500,
-      status: "Warning"
-    },
-    {
-      id: 3,
-      area: "Garden",
-      dailyUsage: 45,
-      monthlyUsage: 1350,
-      limit: 2000,
-      status: "Good"
-    },
-    {
-      id: 4,
-      area: "Laundry",
-      dailyUsage: 60,
-      monthlyUsage: 1800,
-      limit: 2000,
-      status: "Good"
-    }
+  const [activeTab, setActiveTab] = useState("quality");
+  const [waterQuality, setWaterQuality] = useState<WaterQualityData>({
+    tds: 250,
+    quality: "Good",
+    flowRate: 12.5,
+    tankLevel: 85,
+  });
+
+  const [waterUsage, setWaterUsage] = useState<WaterUsage>({
+    daily: 285,
+    weekly: 1950,
+    monthly: 8500,
+    yearlyAverage: 300,
+    lastUpdated: new Date(),
+  });
+
+  const [alerts, setAlerts] = useState<UsageAlert[]>([]);
+  const [usageStatus, setUsageStatus] = useState<"good" | "warning" | "high">(
+    "good"
+  );
+  const [dailyTarget] = useState(300); // Daily target in liters
+  const [averageDailyUsage, setAverageDailyUsage] = useState(310);
+  const [currentDailyUsage, setCurrentDailyUsage] = useState(285);
+  const [monthlyRewards, setMonthlyRewards] = useState(0);
+  const [monthlyPenalties, setMonthlyPenalties] = useState(0);
+
+  const usagePatterns: UsagePattern[] = [
+    { hour: 6, usage: 45 },
+    { hour: 7, usage: 65 },
+    { hour: 8, usage: 55 },
+    { hour: 12, usage: 25 },
+    { hour: 18, usage: 40 },
+    { hour: 20, usage: 35 },
   ];
 
-  const savingTips = [
+  const memberUsage: MemberUsage[] = [
     {
-      id: 1,
-      title: "Install Low-Flow Showerheads",
-      description: "Replace standard showerheads with low-flow alternatives to save up to 40% water.",
-      savings: "Potential savings: 15,000 L/year",
-      difficulty: "Easy"
+      memberId: "1",
+      name: "Parent 1",
+      dailyUsage: 85,
+      monthlyUsage: 2550,
+      complianceRate: 92,
     },
     {
-      id: 2,
-      title: "Fix Leaky Faucets",
-      description: "A dripping faucet can waste up to 20 gallons per day. Repair leaks promptly.",
-      savings: "Potential savings: 7,300 L/year",
-      difficulty: "Easy"
+      memberId: "2",
+      name: "Parent 2",
+      dailyUsage: 75,
+      monthlyUsage: 2250,
+      complianceRate: 88,
     },
     {
-      id: 3,
-      title: "Install Dual-Flush Toilets",
-      description: "Upgrade to dual-flush toilets to use less water for liquid waste.",
-      savings: "Potential savings: 25,000 L/year",
-      difficulty: "Medium"
-    }
+      memberId: "3",
+      name: "Child 1",
+      dailyUsage: 65,
+      monthlyUsage: 1950,
+      complianceRate: 95,
+    },
   ];
+
+  useEffect(() => {
+    // Calculate usage status
+    const dailyPercentage = (waterUsage.daily / dailyTarget) * 100;
+    if (dailyPercentage > 120) {
+      setUsageStatus("high");
+    } else if (dailyPercentage > 90) {
+      setUsageStatus("warning");
+    } else {
+      setUsageStatus("good");
+    }
+
+    // Generate alerts
+    const newAlerts: UsageAlert[] = [];
+    if (dailyPercentage > 120) {
+      newAlerts.push({
+        type: "danger",
+        message: "Daily usage significantly above target",
+      });
+    } else if (dailyPercentage > 90) {
+      newAlerts.push({
+        type: "warning",
+        message: "Approaching daily usage limit",
+      });
+    }
+
+    if (waterUsage.daily > waterUsage.yearlyAverage) {
+      newAlerts.push({
+        type: "warning",
+        message: "Usage above yearly average",
+      });
+    }
+
+    setAlerts(newAlerts);
+    setCurrentDailyUsage(waterUsage.daily);
+    setAverageDailyUsage(waterUsage.yearlyAverage);
+  }, [waterUsage, dailyTarget]);
+
+  // Calculate rewards or penalties based on usage
+  useEffect(() => {
+    const usageDifference = currentDailyUsage - averageDailyUsage;
+    if (usageDifference > 0) {
+      // Calculate penalty (₹10 for every 50L excess)
+      const penalty = Math.ceil(usageDifference / 50) * 10;
+      setMonthlyPenalties((prev) => prev + penalty);
+    } else if (usageDifference < 0) {
+      // Calculate reward (₹5 for every 25L saved)
+      const reward = Math.floor(Math.abs(usageDifference) / 25) * 5;
+      setMonthlyRewards((prev) => prev + reward);
+    }
+  }, [currentDailyUsage, averageDailyUsage]);
+
+  const getStatusColor = (status: typeof usageStatus) => {
+    switch (status) {
+      case "good":
+        return "text-green-500";
+      case "warning":
+        return "text-yellow-500";
+      case "high":
+        return "text-red-500";
+    }
+  };
+
+  const formatUsage = (liters: number) => {
+    return `${liters.toFixed(1)}L`;
+  };
+
+  const getUsageIndicator = (current: number, previous: number) => {
+    const diff = current - previous;
+    if (diff > 0) {
+      return <TrendingUp className="h-4 w-4 text-red-500" />;
+    }
+    return <TrendingDown className="h-4 w-4 text-green-500" />;
+  };
 
   return (
     <div className="space-y-6 p-5">
@@ -77,250 +198,302 @@ export function HouseholdManagement() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <Home className="h-6 w-6 text-blue-500" />
-            Household Water Management
+            Smart Water Management
           </h2>
           <p className="text-gray-500 dark:text-gray-400">
-            Monitor and optimize your household water usage with smart recommendations
+            Real-time monitoring and intelligent water usage optimization
           </p>
         </div>
-        <Button className="bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600">
-          <Settings className="mr-2 h-4 w-4" /> Configure Sensors
-        </Button>
       </div>
 
-      <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-4"
+      >
         <TabsList className="bg-blue-50 dark:bg-blue-900/30 p-1">
-          <TabsTrigger value="overview" className="data-[state=active]:bg-white dark:data-[state=active]:bg-blue-800">
-            Overview
+          <TabsTrigger value="quality">
+            <Droplet className="h-4 w-4 mr-2" />
+            Water Quality
           </TabsTrigger>
-          <TabsTrigger value="usage" className="data-[state=active]:bg-white dark:data-[state=active]:bg-blue-800">
-            Usage Details
+          <TabsTrigger value="usage">
+            <Activity className="h-4 w-4 mr-2" />
+            Usage Tracking
           </TabsTrigger>
-          <TabsTrigger value="savings" className="data-[state=active]:bg-white dark:data-[state=active]:bg-blue-800">
-            Saving Tips
+          <TabsTrigger value="patterns">
+            <Clock className="h-4 w-4 mr-2" />
+            Usage Patterns
           </TabsTrigger>
-          <TabsTrigger value="history" className="data-[state=active]:bg-white dark:data-[state=active]:bg-blue-800">
-            History
+          <TabsTrigger value="members">
+            <Users className="h-4 w-4 mr-2" />
+            Member Analysis
+          </TabsTrigger>
+          <TabsTrigger value="rewards">
+            <Activity className="h-4 w-4 mr-2" />
+            Rewards
           </TabsTrigger>
         </TabsList>
-        
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Monthly Usage</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Current Usage</span>
-                  <span className="font-medium">9,300 L</span>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Monthly Limit</span>
-                  <span className="font-medium">10,500 L</span>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Days Remaining</span>
-                  <span className="font-medium">8</span>
-                </div>
-                
-                <Separator />
-                
-                <div className="pt-2">
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Usage Progress</span>
-                    <span className="font-medium">88%</span>
-                  </div>
-                  <Progress value={88} className="h-2" />
-                  <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
-                    <AlertTriangle className="inline h-3 w-3 mr-1" />
-                    You're approaching your monthly limit
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Water Efficiency</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                  <div className="flex gap-2 text-green-700 dark:text-green-500">
-                    <CheckCircle className="h-5 w-5 flex-shrink-0" />
-                    <div className="text-sm">
-                      <p className="font-medium">Efficiency Score: 82/100</p>
-                      <p className="mt-1">Your household is 15% more efficient than neighborhood average</p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                  <div className="flex gap-2 text-yellow-700 dark:text-yellow-500">
-                    <AlertTriangle className="h-5 w-5 flex-shrink-0" />
-                    <div className="text-sm">
-                      <p className="font-medium">Bathroom Usage Alert</p>
-                      <p className="mt-1">Bathroom water usage is 3% above your monthly average</p>
-                      <div className="mt-2">
-                        <Button variant="outline" size="sm" className="h-7 text-xs">View Details</Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Potential Savings</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Monthly Potential</span>
-                  <span className="font-medium text-green-600 dark:text-green-400">1,250 L</span>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Yearly Potential</span>
-                  <span className="font-medium text-green-600 dark:text-green-400">15,000 L</span>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Cost Savings</span>
-                  <span className="font-medium text-green-600 dark:text-green-400">$175/year</span>
-                </div>
-                
-                <Separator />
-                
-                <div className="pt-2">
-                  <Button variant="outline" size="sm" className="w-full">
-                    <BarChart2 className="mr-2 h-4 w-4" />
-                    View Detailed Analysis
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          
-          <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+
+        <TabsContent value="quality">
+          <Card>
             <CardHeader>
-              <CardTitle>Usage by Area</CardTitle>
-              <CardDescription>Water consumption breakdown by household area</CardDescription>
+              <CardTitle>Water Quality Parameters</CardTitle>
+              <CardDescription>
+                Real-time water quality monitoring
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200 dark:border-gray-700">
-                      <th className="text-left py-3 px-4 font-medium">Area</th>
-                      <th className="text-left py-3 px-4 font-medium">Daily Usage</th>
-                      <th className="text-left py-3 px-4 font-medium">Monthly Usage</th>
-                      <th className="text-left py-3 px-4 font-medium">Monthly Limit</th>
-                      <th className="text-left py-3 px-4 font-medium">Status</th>
-                      <th className="text-left py-3 px-4 font-medium">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {usageData.map((area) => (
-                      <tr key={area.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                        <td className="py-3 px-4">{area.area}</td>
-                        <td className="py-3 px-4">{area.dailyUsage} L</td>
-                        <td className="py-3 px-4">{area.monthlyUsage} L</td>
-                        <td className="py-3 px-4">{area.limit} L</td>
-                        <td className="py-3 px-4">
-                          <Badge variant={area.status === "Good" ? "outline" : "default"} className={
-                            area.status === "Good" 
-                              ? "text-green-500 border-green-200 dark:border-green-800"
-                              : "bg-yellow-500"
-                          }>
-                            {area.status}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4">
-                          <Button variant="outline" size="sm">Details</Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <p className="text-sm text-gray-500">TDS Level</p>
+                <p className="text-2xl font-bold">{waterQuality.tds} ppm</p>
+                <Badge
+                  className="mt-2"
+                  variant={waterQuality.tds < 300 ? "outline" : "destructive"}
+                >
+                  {waterQuality.tds < 300 ? "Normal" : "High"}
+                </Badge>
+              </div>
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                <p className="text-sm text-gray-500">Water Quality</p>
+                <p className="text-2xl font-bold">{waterQuality.quality}</p>
+                <Badge className="mt-2" variant="outline">
+                  {waterQuality.quality}
+                </Badge>
+              </div>
+              <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                <p className="text-sm text-gray-500">Flow Rate</p>
+                <p className="text-2xl font-bold">
+                  {waterQuality.flowRate} L/min
+                </p>
+                <Badge className="mt-2" variant="outline">
+                  Normal Flow
+                </Badge>
+              </div>
+              <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                <p className="text-sm text-gray-500">Tank Level</p>
+                <p className="text-2xl font-bold">{waterQuality.tankLevel}%</p>
+                <Progress value={waterQuality.tankLevel} className="mt-2" />
               </div>
             </CardContent>
           </Card>
         </TabsContent>
-        
-        <TabsContent value="usage" className="space-y-4">
-          <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+
+        <TabsContent value="usage">
+          <Card>
             <CardHeader>
-              <CardTitle>Detailed Usage Analysis</CardTitle>
-              <CardDescription>Comprehensive breakdown of your water consumption</CardDescription>
+              <CardTitle>Water Usage Parameters</CardTitle>
+              <CardDescription>
+                Real-time water consumption tracking
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="aspect-video relative rounded-lg overflow-hidden bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
-                <div className="text-center text-gray-500 dark:text-gray-400">
-                  <BarChart2 className="h-12 w-12 mx-auto mb-2 text-blue-400 opacity-50" />
-                  <p>Detailed usage charts and analytics will be displayed here</p>
+            <CardContent className="space-y-6">
+              {/* Daily Usage */}
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm font-medium">Daily Usage</span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`font-bold ${getStatusColor(usageStatus)}`}
+                    >
+                      {formatUsage(waterUsage.daily)}
+                    </span>
+                    <span className="text-sm text-gray-500">
+                      / {formatUsage(dailyTarget)}
+                    </span>
+                  </div>
                 </div>
+                <Progress
+                  value={(waterUsage.daily / dailyTarget) * 100}
+                  className="h-2"
+                />
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="savings" className="space-y-4">
-          <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle>Water Saving Recommendations</CardTitle>
-              <CardDescription>AI-powered suggestions to reduce your water consumption</CardDescription>
-            </CardHeader>
-            <CardContent>
+
+              {/* Usage Statistics */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {savingTips.map((tip) => (
-                  <Card key={tip.id} className="border border-blue-100 dark:border-blue-800">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base">{tip.title}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <p className="text-sm">{tip.description}</p>
-                      <p className="text-sm text-green-600 dark:text-green-400 font-medium">{tip.savings}</p>
-                      <Badge variant="outline" className="mt-2">
-                        {tip.difficulty} Implementation
-                      </Badge>
-                    </CardContent>
-                    <CardFooter>
-                      <Button variant="outline" size="sm" className="w-full">Learn More</Button>
-                    </CardFooter>
-                  </Card>
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">
+                      Weekly Average
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {getUsageIndicator(
+                        waterUsage.weekly / 7,
+                        waterUsage.daily
+                      )}
+                      <span className="font-medium">
+                        {formatUsage(waterUsage.weekly / 7)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">
+                      Monthly Average
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {getUsageIndicator(
+                        waterUsage.monthly / 30,
+                        waterUsage.daily
+                      )}
+                      <span className="font-medium">
+                        {formatUsage(waterUsage.monthly / 30)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">
+                      Yearly Average
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {getUsageIndicator(
+                        waterUsage.yearlyAverage,
+                        waterUsage.daily
+                      )}
+                      <span className="font-medium">
+                        {formatUsage(waterUsage.yearlyAverage)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Alerts */}
+              {alerts.length > 0 && (
+                <div className="space-y-2">
+                  {alerts.map((alert, index) => (
+                    <div
+                      key={index}
+                      className={`flex items-center gap-2 p-3 rounded-lg ${
+                        alert.type === "danger"
+                          ? "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400"
+                          : "bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400"
+                      }`}
+                    >
+                      <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                      <span className="text-sm">{alert.message}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Last Updated */}
+              <div className="text-xs text-gray-500">
+                Last updated: {waterUsage.lastUpdated.toLocaleString()}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="patterns">
+          <Card>
+            <CardHeader>
+              <CardTitle>Daily Usage Patterns</CardTitle>
+              <CardDescription>
+                Time-based water consumption analysis
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {usagePatterns.map((pattern) => (
+                  <div key={pattern.hour} className="flex items-center gap-4">
+                    <div className="w-20 text-sm text-gray-500">
+                      {pattern.hour}:00
+                    </div>
+                    <div className="flex-1">
+                      <Progress
+                        value={(pattern.usage / 100) * 100}
+                        className="h-4"
+                      />
+                    </div>
+                    <div className="w-20 text-sm font-medium">
+                      {pattern.usage}L
+                    </div>
+                  </div>
                 ))}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
-        
-        <TabsContent value="history" className="space-y-4">
-          <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+
+        <TabsContent value="members">
+          <Card>
             <CardHeader>
-              <CardTitle>Usage History</CardTitle>
-              <CardDescription>Track your water consumption over time</CardDescription>
+              <CardTitle>Member Usage Analysis</CardTitle>
+              <CardDescription>
+                Individual water consumption tracking
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {memberUsage.map((member) => (
+                  <div key={member.memberId} className="p-4 border rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-medium">{member.name}</p>
+                        <p className="text-sm text-gray-500">
+                          Daily: {member.dailyUsage}L | Monthly:{" "}
+                          {member.monthlyUsage}L
+                        </p>
+                      </div>
+                      <Badge
+                        variant={
+                          member.complianceRate >= 90 ? "outline" : "default"
+                        }
+                        className={
+                          member.complianceRate >= 90 ? "text-green-500" : ""
+                        }
+                      >
+                        {member.complianceRate}% Compliant
+                      </Badge>
+                    </div>
+                    <Progress value={member.complianceRate} className="mt-2" />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="rewards">
+          <Card>
+            <CardHeader>
+              <CardTitle>Rewards & Penalties</CardTitle>
+              <CardDescription>Usage-based incentive system</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-x-2">
-                  <Button variant="outline" size="sm">
-                    <Calendar className="mr-2 h-4 w-4" />
-                    Last 30 Days
-                  </Button>
-                  <Button variant="outline" size="sm">3 Months</Button>
-                  <Button variant="outline" size="sm">6 Months</Button>
-                  <Button variant="outline" size="sm">1 Year</Button>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <p className="text-sm text-gray-500">Average Daily Target</p>
+                  <p className="text-2xl font-bold">{averageDailyUsage} L</p>
                 </div>
-                <Button variant="outline" size="sm">Export Data</Button>
-              </div>
-              
-              <div className="aspect-video relative rounded-lg overflow-hidden bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
-                <div className="text-center text-gray-500 dark:text-gray-400">
-                  <BarChart2 className="h-12 w-12 mx-auto mb-2 text-blue-400 opacity-50" />
-                  <p>Historical usage data will be displayed here</p>
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <p className="text-sm text-gray-500">Current Daily Usage</p>
+                  <p className="text-2xl font-bold">{currentDailyUsage} L</p>
+                  <Badge
+                    className={
+                      currentDailyUsage <= averageDailyUsage
+                        ? "bg-green-500"
+                        : "bg-red-500"
+                    }
+                  >
+                    {currentDailyUsage <= averageDailyUsage
+                      ? "Under Target"
+                      : "Over Target"}
+                  </Badge>
+                </div>
+                <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                  <p className="text-sm text-gray-500">Monthly Balance</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    +₹{monthlyRewards}
+                  </p>
+                  <p className="text-lg font-bold text-red-600">
+                    -₹{monthlyPenalties}
+                  </p>
                 </div>
               </div>
             </CardContent>
