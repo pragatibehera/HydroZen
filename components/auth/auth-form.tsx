@@ -1,25 +1,18 @@
 "use client";
 
-import { Auth } from "@supabase/auth-ui-react";
-import { ThemeSupa } from "@supabase/auth-ui-shared";
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { Auth } from '@supabase/auth-ui-react';
+import { ThemeSupa } from '@supabase/auth-ui-shared';
+import { supabase } from '@/lib/supabase';
 
 export function AuthForm() {
-  const [origin, setOrigin] = useState("");
-
-  useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
-
   return (
-    <div className="max-w-md w-full mx-auto">
+    <div className="w-full max-w-md mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
       <Auth
         supabaseClient={supabase}
         appearance={{ theme: ThemeSupa }}
         theme="default"
         providers={[]}
-        redirectTo={origin ? `${origin}/auth/callback` : undefined}
+        redirectTo={`${window.location.origin}/auth/callback`}
       />
     </div>
   );
