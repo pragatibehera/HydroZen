@@ -8,7 +8,7 @@ interface VerificationResult {
 
 export async function verifyLeakageImage(imageUrl: string): Promise<VerificationResult> {
   try {
-    console.log("Starting image verification with OpenRouter/Gemini...");
+    console.log("Starting image verification with Gemini Flash...");
     
     const apiKey = process.env.NEXT_PUBLIC_OPENROUTER_API_KEY;
     if (!apiKey) {
@@ -25,14 +25,14 @@ export async function verifyLeakageImage(imageUrl: string): Promise<Verification
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        "model": "google/gemini-pro-vision",
+        "model": "google/gemini-2.0-flash-thinking-exp:free",
         "messages": [
           {
             "role": "user",
             "content": [
               {
                 "type": "text",
-                "text": "Analyze this image for water leakage. Look for: 1) Visible water leaks 2) Dripping or spraying water 3) Wet or damaged areas 4) Broken pipes or faucets. Respond ONLY in this exact JSON format: { \"isLeakage\": boolean, \"confidence\": number between 0 and 1, \"description\": \"detailed description of what you see\" }"
+                "text": "Look at this image and tell me if you see any signs of water leakage or water-related issues. Consider things like: water puddles, wet surfaces, dripping, or any water-related damage. Respond ONLY in this exact JSON format: { \"isLeakage\": boolean, \"confidence\": number between 0 and 1, \"description\": \"detailed description of what you see\" }"
               },
               {
                 "type": "image_url",
@@ -79,17 +79,18 @@ export async function verifyLeakageImage(imageUrl: string): Promise<Verification
       return parsedResponse;
     } catch (parseError) {
       console.error("Failed to parse API response:", parseError);
-      console.log("Attempting to extract information from raw text...");
+      console.log("Raw response text:", text);
       
-      // If JSON parsing fails, make a best effort to interpret the response
-      const isLeakageIndicator = text.toLowerCase().includes('leak') || 
-                                text.toLowerCase().includes('water damage') ||
-                                text.toLowerCase().includes('dripping') ||
-                                text.toLowerCase().includes('broken pipe');
+      // Simple text analysis for backup
+      const isLeakageIndicator = text.toLowerCase().includes('water') && 
+                                (text.toLowerCase().includes('leak') || 
+                                 text.toLowerCase().includes('drip') || 
+                                 text.toLowerCase().includes('puddle') || 
+                                 text.toLowerCase().includes('wet'));
       
       return {
         isLeakage: isLeakageIndicator,
-        confidence: isLeakageIndicator ? 0.8 : 0.2,
+        confidence: 0.5, // Lower confidence for backup analysis
         description: text.slice(0, 200) // Take first 200 characters as description
       };
     }

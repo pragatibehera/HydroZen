@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -18,45 +18,185 @@ import {
   AlertTriangle,
   Camera,
   MapPin,
+  Loader2,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { LeakageVerification } from "@/components/LeakageVerification";
+import { LeakageHistory } from "../LeakageHistory";
+import { UserRewards } from "../UserRewards";
+import { supabase } from "@/lib/supabase";
+import { useUser } from "@supabase/auth-helpers-react";
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+
+interface RecentLeak {
+  id: string;
+  location: string | null;
+  severity: string;
+  status: string;
+  reported_by: string;
+  created_at: string;
+  points_awarded: number | null;
+  user_id: string;
+  verification_confidence: number | null;
+}
+
+interface UserContribution {
+  total_reports: number;
+  verified_reports: number;
+  total_points: number;
+  verification_rate: number;
+}
 
 export function LeakageDetection() {
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [recentLeaks, setRecentLeaks] = useState<RecentLeak[]>([]);
+  const [userContribution, setUserContribution] = useState<UserContribution>({
+    total_reports: 0,
+    verified_reports: 0,
+    total_points: 0,
+    verification_rate: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const user = useUser();
+  const { toast } = useToast();
 
-  const recentLeaks = [
-    {
-      id: 1,
-      location: "Main Street Pipeline",
-      severity: "High",
-      status: "Verified",
-      reportedBy: "System",
-      time: "2 hours ago",
-      points: null,
-    },
-    {
-      id: 2,
-      location: "Residential Area B, Block 4",
-      severity: "Medium",
-      status: "Under Review",
-      reportedBy: "Sarah Chen",
-      time: "Yesterday",
-      points: 25,
-    },
-    {
-      id: 3,
-      location: "Commercial District, Building 7",
-      severity: "Low",
-      status: "Fixed",
-      reportedBy: "You",
-      time: "3 days ago",
-      points: 15,
-    },
-  ];
+  useEffect(() => {
+    async function fetchDashboardData() {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        console.log("Fetching dashboard data for user:", user.id);
+
+        // Fetch recent leaks with error handling
+        const { data: leaksData, error: leaksError } = await supabase
+          .from("leakage_reports")
+          .select(
+            `
+            id,
+            location,
+            status,
+            user_id,
+            created_at,
+            points_awarded,
+            verification_confidence
+          `
+          )
+          .order("created_at", { ascending: false })
+          .limit(5);
+
+        if (leaksError) {
+          console.error("Error fetching recent leaks:", leaksError);
+          toast({
+            title: "Error loading recent leaks",
+            description: leaksError.message,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Transform the data to include reported_by and calculate severity
+        const transformedLeaks = (leaksData || []).map((leak) => {
+          // Calculate severity based on verification confidence
+          let severity = "Low";
+          if (leak.verification_confidence) {
+            if (leak.verification_confidence >= 0.8) {
+              severity = "High";
+            } else if (leak.verification_confidence >= 0.5) {
+              severity = "Medium";
+            }
+          }
+
+          return {
+            ...leak,
+            severity,
+            reported_by: leak.user_id === user.id ? user.email : "Other User",
+          };
+        }) as RecentLeak[];
+
+        setRecentLeaks(transformedLeaks);
+
+        // Fetch user contribution stats with error handling
+        const { data: userStats, error: statsError } = await supabase
+          .from("leakage_reports")
+          .select("id, status, points_awarded")
+          .eq("user_id", user.id);
+
+        if (statsError) {
+          console.error("Error fetching user stats:", statsError);
+          toast({
+            title: "Error loading user statistics",
+            description: statsError.message,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Calculate user contribution stats
+        if (userStats) {
+          const totalReports = userStats.length;
+          const verifiedReports = userStats.filter(
+            (report) => report.status === "verified"
+          ).length;
+          const totalPoints = userStats.reduce(
+            (sum, report) => sum + (report.points_awarded || 0),
+            0
+          );
+          const verificationRate =
+            totalReports > 0 ? (verifiedReports / totalReports) * 100 : 0;
+
+          setUserContribution({
+            total_reports: totalReports,
+            verified_reports: verifiedReports,
+            total_points: totalPoints,
+            verification_rate: verificationRate,
+          });
+        }
+
+        console.log("Dashboard data loaded successfully");
+      } catch (error) {
+        console.error("Error in fetchDashboardData:", error);
+        toast({
+          title: "Error loading dashboard",
+          description: "Please check your connection and try again",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchDashboardData();
+  }, [user, toast]);
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          <p className="text-sm text-gray-500">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show message if no user
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-gray-500">Please sign in to view the dashboard</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-5">
@@ -231,14 +371,18 @@ export function LeakageDetection() {
                   <span className="text-sm text-gray-500 dark:text-gray-400">
                     Leaks Reported
                   </span>
-                  <span className="font-medium">7</span>
+                  <span className="font-medium">
+                    {userContribution.total_reports}
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-500 dark:text-gray-400">
                     Verified Reports
                   </span>
-                  <span className="font-medium">5</span>
+                  <span className="font-medium">
+                    {userContribution.verified_reports}
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between">
@@ -246,7 +390,7 @@ export function LeakageDetection() {
                     Points Earned
                   </span>
                   <span className="font-medium text-blue-600 dark:text-blue-400">
-                    125
+                    {userContribution.total_points}
                   </span>
                 </div>
 
@@ -255,9 +399,14 @@ export function LeakageDetection() {
                 <div className="pt-2">
                   <div className="flex justify-between text-sm mb-1">
                     <span>Verification Rate</span>
-                    <span className="font-medium">71%</span>
+                    <span className="font-medium">
+                      {Math.round(userContribution.verification_rate)}%
+                    </span>
                   </div>
-                  <Progress value={71} className="h-2" />
+                  <Progress
+                    value={userContribution.verification_rate}
+                    className="h-2"
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -302,7 +451,9 @@ export function LeakageDetection() {
                         key={leak.id}
                         className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50"
                       >
-                        <td className="py-3 px-4">{leak.location}</td>
+                        <td className="py-3 px-4">
+                          {leak.location || "Unknown Location"}
+                        </td>
                         <td className="py-3 px-4">
                           <Badge
                             variant={
@@ -326,28 +477,35 @@ export function LeakageDetection() {
                           <div className="flex items-center gap-2">
                             <Avatar className="h-6 w-6">
                               <AvatarFallback className="text-xs">
-                                {leak.reportedBy === "System"
+                                {leak.reported_by === "System"
                                   ? "SYS"
-                                  : leak.reportedBy === "You"
+                                  : leak.reported_by === user?.email
                                   ? "YOU"
-                                  : leak.reportedBy
-                                      .split(" ")
+                                  : leak.reported_by
+                                      ?.split(" ")
                                       .map((n) => n[0])
-                                      .join("")}
+                                      .join("") || "?"}
                               </AvatarFallback>
                             </Avatar>
-                            <span className="text-sm">{leak.reportedBy}</span>
+                            <span className="text-sm">
+                              {leak.reported_by === user?.email
+                                ? "You"
+                                : leak.reported_by}
+                            </span>
                           </div>
                         </td>
                         <td className="py-3 px-4">
                           <span className="text-sm text-gray-500">
-                            {leak.time}
+                            {format(
+                              new Date(leak.created_at),
+                              "MMM d, yyyy h:mm a"
+                            )}
                           </span>
                         </td>
                         <td className="py-3 px-4">
-                          {leak.points ? (
+                          {leak.points_awarded ? (
                             <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                              +{leak.points}
+                              +{leak.points_awarded}
                             </span>
                           ) : (
                             <span className="text-sm text-gray-500">-</span>
@@ -432,11 +590,9 @@ export function LeakageDetection() {
                 All your past leak reports and their status
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <p className="text-center py-8 text-gray-500 dark:text-gray-400">
-                Your leak reporting history will appear here
-              </p>
-            </CardContent>
+
+            <CardContent></CardContent>
+            <LeakageHistory />
           </Card>
         </TabsContent>
 
@@ -449,9 +605,7 @@ export function LeakageDetection() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-center py-8 text-gray-500 dark:text-gray-400">
-                Your rewards and achievements will appear here
-              </p>
+              <UserRewards />
             </CardContent>
           </Card>
         </TabsContent>

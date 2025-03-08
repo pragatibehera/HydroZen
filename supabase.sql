@@ -170,4 +170,41 @@ insert into public.achievements (name, description, points_required, badge_url) 
   ('Water Warrior', 'Report 10 water leakages', 1000, null),
   ('Conservation Champion', 'Report 25 water leakages', 2500, null),
   ('Water Guardian', 'Earn 5000 points through various activities', 5000, null)
-on conflict do nothing; 
+on conflict do nothing;
+
+-- Verify and update RLS policies for leakage reports
+create policy if not exists "Users can read their own leakage reports"
+  on public.leakage_reports
+  for select
+  using (auth.uid() = user_id);
+
+-- Verify and update RLS policies for user achievements
+create policy if not exists "Users can read their own achievements"
+  on public.user_achievements
+  for select
+  using (auth.uid() = user_id);
+
+-- Verify and update RLS policies for achievements (public read)
+create policy if not exists "Anyone can read achievements"
+  on public.achievements
+  for select
+  using (true);
+
+-- Verify and update RLS policies for users
+create policy if not exists "Users can read their own data"
+  on public.users
+  for select
+  using (auth.uid() = id);
+
+-- Create indexes for better performance if they don't exist
+create index if not exists idx_leakage_reports_user_id_created_at 
+  on public.leakage_reports(user_id, created_at desc);
+
+create index if not exists idx_user_achievements_user_id 
+  on public.user_achievements(user_id);
+
+-- Grant necessary permissions
+grant select on public.leakage_reports to authenticated;
+grant select on public.achievements to authenticated;
+grant select on public.user_achievements to authenticated;
+grant select on public.users to authenticated; 

@@ -65,13 +65,14 @@ export function LeakageVerification() {
       const verificationResult = await verifyLeakageImage(imageUrl);
       console.log("Verification result:", verificationResult);
 
-      if (verificationResult.isLeakage && verificationResult.confidence > 0.7) {
+      // More lenient verification check
+      if (verificationResult.isLeakage && verificationResult.confidence > 0.3) {
         setUploadStatus("Verified! Processing rewards...");
         // Add points and create leakage report
         await addPointsForLeakage(user.id, imageUrl, verificationResult);
 
         toast({
-          title: "Leakage Verified!",
+          title: "Water-Related Issue Detected",
           description:
             "Thank you for your report! Points have been added to your account.",
         });
@@ -81,10 +82,10 @@ export function LeakageVerification() {
         setPreviewUrl(null);
       } else {
         toast({
-          title: "Not a Valid Leakage",
+          title: "No Water Issues Detected",
           description:
             verificationResult.description ||
-            "The image doesn't show a clear water leakage. Please try another image.",
+            "The image doesn't show any clear signs of water-related issues. Please try another image.",
           variant: "destructive",
         });
       }
