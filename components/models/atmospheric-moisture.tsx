@@ -487,12 +487,11 @@ export function AtmosphericMoisture() {
                             lng: currentLocation.longitude,
                           }}
                           icon={{
-                            path: google.maps.SymbolPath.CIRCLE,
-                            fillColor: "#2196F3",
-                            fillOpacity: 1,
-                            strokeColor: "#ffffff",
-                            strokeWeight: 2,
-                            scale: 8,
+                            url: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
+                            scaledSize: {
+                              width: 32,
+                              height: 32,
+                            },
                           }}
                           title={`Current Location (${formatNumber(
                             weatherParams.predicted_humidity
@@ -526,7 +525,7 @@ export function AtmosphericMoisture() {
                                 lng: location.lng,
                               }}
                               icon={{
-                                path: google.maps.SymbolPath.CIRCLE,
+                                path: 0, // 0 is equivalent to google.maps.SymbolPath.CIRCLE
                                 fillColor: "#FFC107",
                                 fillOpacity: 1,
                                 strokeColor: "#ffffff",
