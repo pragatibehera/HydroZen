@@ -42,31 +42,34 @@ export function UserRewards() {
   useEffect(() => {
     async function fetchData() {
       if (!user) {
-        console.log("No user found");
+        setLoading(false);
         return;
       }
 
       try {
-        console.log("Fetching data for user:", user.id);
+        console.log("Fetching rewards data for user:", user.id);
 
-        // Fetch user stats
-        const { data: userData, error: userError } = await supabase
-          .from("users")
-          .select("points, total_leakages_reported")
-          .eq("id", user.id)
-          .single();
+        // Fetch user stats from leakage_reports
+        const { data: reportsData, error: reportsError } = await supabase
+          .from("leakage_reports")
+          .select("points_awarded")
+          .eq("user_id", user.id);
 
-        if (userError) {
-          console.error("Error fetching user stats:", userError);
-          toast({
-            title: "Error fetching stats",
-            description: "Failed to load your statistics. Please try again.",
-            variant: "destructive",
-          });
-          throw userError;
+        if (reportsError) {
+          console.error("Error fetching user reports:", reportsError);
+          throw reportsError;
         }
-        console.log("User stats:", userData);
-        setUserStats(userData);
+
+        const totalPoints = reportsData.reduce(
+          (sum, report) => sum + (report.points_awarded || 0),
+          0
+        );
+        const totalLeakages = reportsData.length;
+
+        setUserStats({
+          points: totalPoints,
+          total_leakages_reported: totalLeakages,
+        });
 
         // Fetch all achievements
         const { data: achievementsData, error: achievementsError } =
@@ -78,13 +81,13 @@ export function UserRewards() {
         if (achievementsError) {
           console.error("Error fetching achievements:", achievementsError);
           toast({
-            title: "Error fetching achievements",
+            title: "Error loading achievements",
             description: "Failed to load achievements. Please try again.",
             variant: "destructive",
           });
           throw achievementsError;
         }
-        console.log("Achievements:", achievementsData);
+
         setAchievements(achievementsData || []);
 
         // Fetch user's achievements with proper join
@@ -112,19 +115,75 @@ export function UserRewards() {
             userAchievementsError
           );
           toast({
-            title: "Error fetching your achievements",
+            title: "Error loading your achievements",
             description: "Failed to load your achievements. Please try again.",
             variant: "destructive",
           });
           throw userAchievementsError;
         }
 
-        console.log("User achievements:", userAchievementsData);
-        setUserAchievements(
-          userAchievementsData as unknown as UserAchievement[]
-        );
+        // Check for new achievements based on points
+        if (achievementsData) {
+          const earnedAchievements = achievementsData.filter(
+            (achievement: Achievement) =>
+              achievement.points_required <= totalPoints
+          );
+
+          // Add any new achievements that haven't been recorded yet
+          for (const achievement of earnedAchievements) {
+            const hasAchievement = userAchievementsData?.some(
+              (ua: any) => ua.achievement.id === achievement.id
+            );
+
+            if (!hasAchievement) {
+              const { error: insertError } = await supabase
+                .from("user_achievements")
+                .insert({
+                  user_id: user.id,
+                  achievement_id: achievement.id,
+                  achieved_at: new Date().toISOString(),
+                });
+
+              if (insertError) {
+                console.error("Error recording new achievement:", insertError);
+              }
+            }
+          }
+        }
+
+        // Fetch updated user achievements after potential new additions
+        const { data: updatedAchievements, error: updateError } = await supabase
+          .from("user_achievements")
+          .select(
+            `
+            id,
+            achieved_at,
+            achievement:achievements (
+              id,
+              name,
+              description,
+              points_required,
+              badge_url
+            )
+          `
+          )
+          .eq("user_id", user.id)
+          .returns<UserAchievement[]>();
+
+        if (updateError) {
+          console.error("Error fetching updated achievements:", updateError);
+        } else {
+          setUserAchievements(updatedAchievements || []);
+        }
+
+        console.log("Rewards data loaded successfully");
       } catch (error) {
-        console.error("Error fetching rewards data:", error);
+        console.error("Error in fetchData:", error);
+        toast({
+          title: "Error loading rewards",
+          description: "Please check your connection and try again",
+          variant: "destructive",
+        });
       } finally {
         setLoading(false);
       }
@@ -151,7 +210,18 @@ export function UserRewards() {
   if (loading) {
     return (
       <div className="flex justify-center items-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          <p className="text-sm text-gray-500">Loading rewards data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="text-center p-8">
+        <p className="text-gray-500">Please sign in to view your rewards</p>
       </div>
     );
   }
