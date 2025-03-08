@@ -8,7 +8,7 @@ import { Sidebar } from '@/components/sidebar';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'HydroZen - AI-Powered Water Conservation',
+  title: 'HydroZen - AI-Powered Water Conservation & Smart Irrigation',
   description: 'Intelligent water conservation platform with AI-powered insights and community engagement',
 };
 
