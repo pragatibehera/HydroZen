@@ -1,18 +1,33 @@
 "use client";
 
-import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Droplet, Upload, CheckCircle, AlertTriangle, Camera, MapPin } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Droplet,
+  Upload,
+  CheckCircle,
+  AlertTriangle,
+  Camera,
+  MapPin,
+} from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { LeakageVerification } from "@/components/LeakageVerification";
 
 export function LeakageDetection() {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  
+  const [activeTab, setActiveTab] = useState("dashboard");
+
   const recentLeaks = [
     {
       id: 1,
@@ -21,7 +36,7 @@ export function LeakageDetection() {
       status: "Verified",
       reportedBy: "System",
       time: "2 hours ago",
-      points: null
+      points: null,
     },
     {
       id: 2,
@@ -30,7 +45,7 @@ export function LeakageDetection() {
       status: "Under Review",
       reportedBy: "Sarah Chen",
       time: "Yesterday",
-      points: 25
+      points: 25,
     },
     {
       id: 3,
@@ -39,8 +54,8 @@ export function LeakageDetection() {
       status: "Fixed",
       reportedBy: "You",
       time: "3 days ago",
-      points: 15
-    }
+      points: 15,
+    },
   ];
 
   return (
@@ -55,27 +70,47 @@ export function LeakageDetection() {
             Detect and report water leaks to earn rewards and save water
           </p>
         </div>
-        <Button className="bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600">
+        <Button
+          onClick={() => setActiveTab("report")}
+          className="bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600"
+        >
           <Camera className="mr-2 h-4 w-4" /> Report New Leak
         </Button>
       </div>
 
-      <Tabs defaultValue="dashboard" value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs
+        defaultValue="dashboard"
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-4"
+      >
         <TabsList className="bg-blue-50 dark:bg-blue-900/30 p-1">
-          <TabsTrigger value="dashboard" className="data-[state=active]:bg-white dark:data-[state=active]:bg-blue-800">
+          <TabsTrigger
+            value="dashboard"
+            className="data-[state=active]:bg-white dark:data-[state=active]:bg-blue-800"
+          >
             Dashboard
           </TabsTrigger>
-          <TabsTrigger value="report" className="data-[state=active]:bg-white dark:data-[state=active]:bg-blue-800">
+          <TabsTrigger
+            value="report"
+            className="data-[state=active]:bg-white dark:data-[state=active]:bg-blue-800"
+          >
             Report Leak
           </TabsTrigger>
-          <TabsTrigger value="history" className="data-[state=active]:bg-white dark:data-[state=active]:bg-blue-800">
+          <TabsTrigger
+            value="history"
+            className="data-[state=active]:bg-white dark:data-[state=active]:bg-blue-800"
+          >
             History
           </TabsTrigger>
-          <TabsTrigger value="rewards" className="data-[state=active]:bg-white dark:data-[state=active]:bg-blue-800">
+          <TabsTrigger
+            value="rewards"
+            className="data-[state=active]:bg-white dark:data-[state=active]:bg-blue-800"
+          >
             Rewards
           </TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="dashboard" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
@@ -84,28 +119,43 @@ export function LeakageDetection() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Network Sensors</span>
-                  <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    Network Sensors
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800"
+                  >
                     <CheckCircle className="mr-1 h-3 w-3" /> Online
                   </Badge>
                 </div>
-                
+
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">AI Detection</span>
-                  <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    AI Detection
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800"
+                  >
                     <CheckCircle className="mr-1 h-3 w-3" /> Active
                   </Badge>
                 </div>
-                
+
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Community Reports</span>
-                  <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    Community Reports
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800"
+                  >
                     <CheckCircle className="mr-1 h-3 w-3" /> Processing
                   </Badge>
                 </div>
-                
+
                 <Separator />
-                
+
                 <div className="pt-2">
                   <div className="flex justify-between text-sm mb-1">
                     <span>System Health</span>
@@ -115,7 +165,7 @@ export function LeakageDetection() {
                 </div>
               </CardContent>
             </Card>
-            
+
             <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg">Current Alerts</CardTitle>
@@ -126,52 +176,82 @@ export function LeakageDetection() {
                     <AlertTriangle className="h-5 w-5 flex-shrink-0" />
                     <div className="text-sm">
                       <p className="font-medium">Potential Leak Detected</p>
-                      <p className="mt-1">Flow discrepancy in Sector 7, Block B. Verification needed.</p>
+                      <p className="mt-1">
+                        Flow discrepancy in Sector 7, Block B. Verification
+                        needed.
+                      </p>
                       <div className="mt-2">
-                        <Button variant="outline" size="sm" className="h-7 text-xs">Verify</Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                        >
+                          Verify
+                        </Button>
                       </div>
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
                   <div className="flex gap-2 text-red-700 dark:text-red-500">
                     <AlertTriangle className="h-5 w-5 flex-shrink-0" />
                     <div className="text-sm">
                       <p className="font-medium">Confirmed Leak</p>
-                      <p className="mt-1">Main Street Pipeline showing significant water loss. Maintenance team dispatched.</p>
+                      <p className="mt-1">
+                        Main Street Pipeline showing significant water loss.
+                        Maintenance team dispatched.
+                      </p>
                       <div className="mt-2 flex gap-2">
-                        <Badge variant="outline" className="text-xs border-red-200 dark:border-red-800">High Priority</Badge>
-                        <Badge variant="outline" className="text-xs border-yellow-200 dark:border-yellow-800">In Progress</Badge>
+                        <Badge
+                          variant="outline"
+                          className="text-xs border-red-200 dark:border-red-800"
+                        >
+                          High Priority
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className="text-xs border-yellow-200 dark:border-yellow-800"
+                        >
+                          In Progress
+                        </Badge>
                       </div>
                     </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
-            
+
             <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg">Your Contribution</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Leaks Reported</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    Leaks Reported
+                  </span>
                   <span className="font-medium">7</span>
                 </div>
-                
+
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Verified Reports</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    Verified Reports
+                  </span>
                   <span className="font-medium">5</span>
                 </div>
-                
+
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Points Earned</span>
-                  <span className="font-medium text-blue-600 dark:text-blue-400">125</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    Points Earned
+                  </span>
+                  <span className="font-medium text-blue-600 dark:text-blue-400">
+                    125
+                  </span>
                 </div>
-                
+
                 <Separator />
-                
+
                 <div className="pt-2">
                   <div className="flex justify-between text-sm mb-1">
                     <span>Verification Rate</span>
@@ -182,38 +262,60 @@ export function LeakageDetection() {
               </CardContent>
             </Card>
           </div>
-          
+
           <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle>Recent Leaks</CardTitle>
-              <CardDescription>Latest reported and detected leaks</CardDescription>
+              <CardDescription>
+                Latest reported and detected leaks
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-200 dark:border-gray-700">
-                      <th className="text-left py-3 px-4 font-medium">Location</th>
-                      <th className="text-left py-3 px-4 font-medium">Severity</th>
-                      <th className="text-left py-3 px-4 font-medium">Status</th>
-                      <th className="text-left py-3 px-4 font-medium">Reported By</th>
+                      <th className="text-left py-3 px-4 font-medium">
+                        Location
+                      </th>
+                      <th className="text-left py-3 px-4 font-medium">
+                        Severity
+                      </th>
+                      <th className="text-left py-3 px-4 font-medium">
+                        Status
+                      </th>
+                      <th className="text-left py-3 px-4 font-medium">
+                        Reported By
+                      </th>
                       <th className="text-left py-3 px-4 font-medium">Time</th>
-                      <th className="text-left py-3 px-4 font-medium">Points</th>
-                      <th className="text-left py-3 px-4 font-medium">Action</th>
+                      <th className="text-left py-3 px-4 font-medium">
+                        Points
+                      </th>
+                      <th className="text-left py-3 px-4 font-medium">
+                        Action
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {recentLeaks.map((leak) => (
-                      <tr key={leak.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                      <tr
+                        key={leak.id}
+                        className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                      >
                         <td className="py-3 px-4">{leak.location}</td>
                         <td className="py-3 px-4">
-                          <Badge variant={leak.severity === "High" ? "default" : "outline"} className={
-                            leak.severity === "High" 
-                              ? "bg-red-500" 
-                              : leak.severity === "Medium"
-                              ? "text-yellow-500 border-yellow-200 dark:border-yellow-800"
-                              : "text-green-500 border-green-200 dark:border-green-800"
-                          }>
+                          <Badge
+                            variant={
+                              leak.severity === "High" ? "default" : "outline"
+                            }
+                            className={
+                              leak.severity === "High"
+                                ? "bg-red-500"
+                                : leak.severity === "Medium"
+                                ? "text-yellow-500 border-yellow-200 dark:border-yellow-800"
+                                : "text-green-500 border-green-200 dark:border-green-800"
+                            }
+                          >
                             {leak.severity}
                           </Badge>
                         </td>
@@ -224,26 +326,37 @@ export function LeakageDetection() {
                           <div className="flex items-center gap-2">
                             <Avatar className="h-6 w-6">
                               <AvatarFallback className="text-xs">
-                                {leak.reportedBy === "System" ? "SYS" : 
-                                 leak.reportedBy === "You" ? "YOU" : 
-                                 leak.reportedBy.split(' ').map(n => n[0]).join('')}
+                                {leak.reportedBy === "System"
+                                  ? "SYS"
+                                  : leak.reportedBy === "You"
+                                  ? "YOU"
+                                  : leak.reportedBy
+                                      .split(" ")
+                                      .map((n) => n[0])
+                                      .join("")}
                               </AvatarFallback>
                             </Avatar>
                             <span className="text-sm">{leak.reportedBy}</span>
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          <span className="text-sm text-gray-500">{leak.time}</span>
+                          <span className="text-sm text-gray-500">
+                            {leak.time}
+                          </span>
                         </td>
                         <td className="py-3 px-4">
                           {leak.points ? (
-                            <span className="text-sm font-medium text-blue-600 dark:text-blue-400">+{leak.points}</span>
+                            <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                              +{leak.points}
+                            </span>
                           ) : (
                             <span className="text-sm text-gray-500">-</span>
                           )}
                         </td>
                         <td className="py-3 px-4">
-                          <Button variant="outline" size="sm">View</Button>
+                          <Button variant="outline" size="sm">
+                            View
+                          </Button>
                         </td>
                       </tr>
                     ))}
@@ -253,70 +366,26 @@ export function LeakageDetection() {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="report" className="space-y-4">
           <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle>Report a Water Leak</CardTitle>
-              <CardDescription>Upload photos and details of water leaks you've found</CardDescription>
+              <CardDescription>
+                Upload photos and details of water leaks you&apos;ve found
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg p-8 text-center">
-                <div className="mx-auto flex flex-col items-center">
-                  <Upload className="h-10 w-10 text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Upload Leak Photos</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                    Drag and drop your photos here, or click to browse
-                  </p>
-                  <Button>
-                    <Upload className="mr-2 h-4 w-4" /> Upload Photos
-                  </Button>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Leak Location</label>
-                    <div className="relative">
-                      <input 
-                        type="text" 
-                        placeholder="Enter address or description"
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800"
-                      />
-                      <MapPin className="absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Severity</label>
-                    <select className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800">
-                      <option>Low - Slow drip or minor leak</option>
-                      <option>Medium - Steady flow or visible damage</option>
-                      <option>High - Major leak or pipe burst</option>
-                    </select>
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-1">Description</label>
-                  <textarea 
-                    placeholder="Describe the leak and its location in detail..."
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 h-[104px]"
-                  ></textarea>
-                </div>
-              </div>
+            <CardContent>
+              <LeakageVerification />
             </CardContent>
-            <CardFooter className="flex justify-between">
-              <Button variant="outline">Cancel</Button>
-              <Button>Submit Report</Button>
-            </CardFooter>
           </Card>
-          
+
           <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle>How It Works</CardTitle>
-              <CardDescription>Learn how leak reporting and verification works</CardDescription>
+              <CardDescription>
+                Learn how leak reporting and verification works
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -326,10 +395,11 @@ export function LeakageDetection() {
                   </div>
                   <h3 className="font-medium mb-2">1. Report a Leak</h3>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Take photos of water leaks you find and submit them through the app
+                    Take photos of water leaks you find and submit them through
+                    the app
                   </p>
                 </div>
-                
+
                 <div className="flex flex-col items-center text-center">
                   <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center mb-4">
                     <CheckCircle className="h-6 w-6 text-blue-600 dark:text-blue-400" />
@@ -339,7 +409,7 @@ export function LeakageDetection() {
                     Our AI system verifies your report and confirms the leak
                   </p>
                 </div>
-                
+
                 <div className="flex flex-col items-center text-center">
                   <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center mb-4">
                     <Badge className="h-6 w-6 text-blue-600 dark:text-blue-400" />
@@ -353,12 +423,14 @@ export function LeakageDetection() {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="history">
           <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle>Your Reporting History</CardTitle>
-              <CardDescription>All your past leak reports and their status</CardDescription>
+              <CardDescription>
+                All your past leak reports and their status
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-center py-8 text-gray-500 dark:text-gray-400">
@@ -367,12 +439,14 @@ export function LeakageDetection() {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="rewards">
           <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle>Rewards & Achievements</CardTitle>
-              <CardDescription>Track your conservation contributions and rewards</CardDescription>
+              <CardDescription>
+                Track your conservation contributions and rewards
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-center py-8 text-gray-500 dark:text-gray-400">
