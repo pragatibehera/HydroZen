@@ -74,33 +74,33 @@ export function Sidebar() {
   const tabs = [
     {
       id: "overview",
-      label: "Hydroview",
+      label: "Dashboard",
       icon: <Home className="h-5 w-5" />,
       path: "/",
     },
     {
-      id: "hydro-Harvest",
-      label: "Hydro Harvest",
+      id: "atmospheric-moisture",
+      label: "Atmospheric Moisture",
       icon: <Cloud className="h-5 w-5" />,
-      path: "/models/hydro-harvest",
+      path: "/models/atmospheric-moisture",
     },
     {
-      id: "hydro-Guard",
-      label: "Hydro Guard",
+      id: "leakage-detection",
+      label: "Leakage Detection",
       icon: <Droplet className="h-5 w-5" />,
-      path: "/models/hydro-guard",
+      path: "/models/leakage-detection",
     },
     {
-      id: "hydro-Hold",
-      label: "Hydro Hold",
+      id: "household-management",
+      label: "Household Management",
       icon: <Home className="h-5 w-5" />,
-      path: "/models/hydro-hold",
+      path: "/models/household-management",
     },
     {
-      id: "hydro-Grow",
-      label: "Hydro Grow",
+      id: "agriculture-optimization",
+      label: "Agriculture Optimization",
       icon: <Leaf className="h-5 w-5" />,
-      path: "/models/hydro-grow",
+      path: "/models/agriculture-optimization",
     },
   ];
 
@@ -144,7 +144,7 @@ export function Sidebar() {
                 isCollapsed ? "justify-center w-full" : "px-2"
               )}
             >
-              <div className="rounded-full bg-w p-1.5 relative group">
+              <div className="rounded-full bg-white p-1.5 relative group">
                 <img
                   src="/Adobe Express - file (1).svg"
                   alt="HydroZen Logo"
