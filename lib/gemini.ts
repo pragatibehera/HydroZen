@@ -10,16 +10,22 @@ export async function verifyLeakageImage(imageUrl: string): Promise<Verification
   try {
     console.log("Starting image verification with OpenRouter/Gemini...");
     
+    const apiKey = process.env.NEXT_PUBLIC_OPENROUTER_API_KEY;
+    if (!apiKey) {
+      throw new Error("OpenRouter API key is not configured");
+    }
+
+    console.log("Making API request to OpenRouter...");
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.NEXT_PUBLIC_OPENROUTER_API_KEY}`,
+        "Authorization": `Bearer ${apiKey}`,
         "HTTP-Referer": "https://hydrozen.vercel.app",
         "X-Title": "HydroZen",
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        "model": "google/gemini-2.0-flash-lite-preview-02-05:free",
+        "model": "google/gemini-pro-vision",
         "messages": [
           {
             "role": "user",
@@ -42,6 +48,12 @@ export async function verifyLeakageImage(imageUrl: string): Promise<Verification
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.error("API Response Error:", {
+        status: response.status,
+        statusText: response.statusText,
+        errorData,
+        headers: Object.fromEntries(response.headers.entries())
+      });
       throw new Error(`API request failed: ${response.status} ${response.statusText} ${JSON.stringify(errorData)}`);
     }
 
@@ -90,6 +102,6 @@ export async function verifyLeakageImage(imageUrl: string): Promise<Verification
         apiKey: process.env.NEXT_PUBLIC_OPENROUTER_API_KEY ? "Present" : "Missing"
       });
     }
-    throw new Error(`Failed to verify image: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw error;
   }
 }
