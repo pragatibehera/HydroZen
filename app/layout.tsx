@@ -12,6 +12,9 @@ export const metadata: Metadata = {
   description: 'Intelligent water conservation platform with AI-powered insights and community engagement',
 };
 
+
+
+
 export default function RootLayout({
   children,
 }: {
