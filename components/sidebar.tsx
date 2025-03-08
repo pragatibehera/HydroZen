@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import MyIcon from "@/public/Adobe Express - file (1).svg"
 import {
   Cloud,
   Droplet,
@@ -144,7 +145,7 @@ export function Sidebar() {
               )}
             >
               <div className="rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 p-1.5 relative group">
-                <Waves className="h-5 w-5 text-white animate-pulse" />
+                <img src="/Adobe Express - file (1).svg" alt="HydroZen Logo" className="h-6 w-6 animate-pulse " />
                 <div className="absolute inset-0 rounded-full bg-blue-400/20 animate-ping group-hover:animate-none"></div>
               </div>
               {!isCollapsed && (
