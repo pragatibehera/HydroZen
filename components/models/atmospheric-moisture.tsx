@@ -68,6 +68,18 @@ declare global {
   }
 }
 
+// Add interface for Firebase data structure
+interface FirebaseEntry {
+  features: {
+    Temperature: number;
+    airflow: number;
+    altitude: number;
+    pressure: number;
+    wind_speed: number;
+  };
+  predicted_humidity: number;
+}
+
 export function AtmosphericMoisture() {
   const [weatherParams, setWeatherParams] = useState<WeatherParams>({
     Temperature: 0,
@@ -85,6 +97,7 @@ export function AtmosphericMoisture() {
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = useState(Date.now());
 
   // Mock locations plus user's location will be shown on map
   const mockLocations: Location[] = [
@@ -104,188 +117,205 @@ export function AtmosphericMoisture() {
     },
   ];
 
+  // Helper functions for potential and status
+  const getPotential = (humidity: number) => {
+    if (humidity > 65) return "Very High";
+    if (humidity > 45) return "High";
+    return "Low";
+  };
+
+  const getStatus = (humidity: number) => {
+    return humidity > 65 ? "Active Monitoring" : "Monitoring";
+  };
+
+  // Separate useEffect for location tracking
   useEffect(() => {
-    // Set up continuous location tracking
     let locationWatcher: number;
 
+    // Function to handle location updates
+    const handleLocationUpdate = (position: GeolocationPosition) => {
+      const { latitude, longitude } = position.coords;
+      console.log("Location updated:", { latitude, longitude });
+
+      setCurrentLocation({
+        latitude,
+        longitude,
+        timestamp: Date.now(), // Use Date.now() instead of position.coords.timestamp
+      });
+      setLocationError(null);
+    };
+
+    // Function to handle location errors
+    const handleLocationError = (error: GeolocationPositionError) => {
+      console.error("Location error:", error.message);
+      setLocationError(
+        error.code === 1
+          ? "Please enable location access in your browser settings."
+          : "Unable to get your location. Please try again."
+      );
+    };
+
+    // Get initial location
     if (navigator.geolocation) {
-      // Get initial location
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setCurrentLocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            timestamp: position.timestamp,
-          });
-          setLocationError(null);
-        },
-        (error) => {
-          console.error("Error getting location:", error);
-          setLocationError(
-            "Unable to get your location. Please enable location services."
-          );
-        },
+        handleLocationUpdate,
+        handleLocationError,
         {
           enableHighAccuracy: true,
-          timeout: 5000,
+          timeout: 10000,
           maximumAge: 0,
         }
       );
 
       // Set up continuous location watching
       locationWatcher = navigator.geolocation.watchPosition(
-        (position) => {
-          setCurrentLocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            timestamp: position.timestamp,
-          });
-          setLocationError(null);
-        },
-        (error) => {
-          console.error("Error watching location:", error);
-          setLocationError("Lost connection to location services.");
-        },
+        handleLocationUpdate,
+        handleLocationError,
         {
           enableHighAccuracy: true,
-          timeout: 5000,
+          timeout: 10000,
           maximumAge: 0,
         }
       );
+    } else {
+      setLocationError("Geolocation is not supported by your browser.");
     }
 
-    // Set up Firebase real-time listener for features and predicted humidity
-    const featuresRef = ref(
-      database,
-      "TransferredFeatures/-OKquAGqOgeRz1qYqMKY/features"
-    );
-    const humidityRef = ref(
-      database,
-      "TransferredFeatures/-OKquAGqOgeRz1qYqMKY/predicted_humidity"
-    );
+    // Cleanup
+    return () => {
+      if (locationWatcher) {
+        navigator.geolocation.clearWatch(locationWatcher);
+      }
+    };
+  }, []); // Empty dependency array since we want this to run once on mount
 
-    // Function to fetch and update data
-    const fetchAndUpdateData = async () => {
+  // Firebase data listener
+  useEffect(() => {
+    const featuresRef = ref(database, "TransferredFeatures");
+    let mounted = true;
+    let lastProcessedData: string | null = null;
+
+    const handleDataUpdate = (snapshot: any) => {
+      if (!mounted) return;
+
       try {
-        console.log("Fetching data from paths:", {
-          features: featuresRef.toString(),
-          humidity: humidityRef.toString(),
-        });
-
-        // Fetch both features and humidity
-        const [featuresSnapshot, humiditySnapshot] = await Promise.all([
-          get(featuresRef),
-          get(humidityRef),
-        ]);
-
-        const featuresData = featuresSnapshot.val();
-        const humidityValue = humiditySnapshot.val();
-
-        console.log("Raw data from Firebase:", {
-          features: featuresData,
-          predicted_humidity: humidityValue,
-        });
-
-        if (!featuresData) {
-          console.warn("No features data received from Firebase");
+        const data = snapshot.val() as Record<string, FirebaseEntry> | null;
+        if (!data) {
+          console.log("No data available in TransferredFeatures");
           return;
         }
 
-        // Ensure we're accessing the correct properties
-        const newWeatherParams = {
-          Temperature: parseFloat(featuresData.Temperature) || 0,
-          airflow: parseFloat(featuresData.airflow) || 0,
-          altitude: parseFloat(featuresData.altitude) || 0,
-          pressure: parseFloat(featuresData.pressure) || 0,
-          wind_speed: parseFloat(featuresData.wind_speed) || 0,
-          predicted_humidity: parseFloat(humidityValue) || 0,
-        };
+        // Get all entries and sort by timestamp if available, otherwise take the latest key
+        const entries = Object.entries(data);
+        if (entries.length === 0) {
+          console.log("No entries found in TransferredFeatures");
+          return;
+        }
 
-        console.log("Parsed weather parameters:", newWeatherParams);
-        setWeatherParams(newWeatherParams);
+        // Get the latest entry
+        const [latestId, latestEntry] = entries[entries.length - 1] as [
+          string,
+          FirebaseEntry
+        ];
 
-        // Update high moisture areas based on real-time humidity
+        // Skip if we've already processed this exact data
+        const dataString = JSON.stringify(latestEntry);
+        if (dataString === lastProcessedData) {
+          console.log("Skipping duplicate data update");
+          return;
+        }
+        lastProcessedData = dataString;
+
+        // Validate the data structure
+        if (
+          !latestEntry?.features ||
+          latestEntry?.predicted_humidity === undefined
+        ) {
+          console.log("Invalid data structure in latest entry", latestId);
+          return;
+        }
+
+        const { features, predicted_humidity } = latestEntry;
+
+        console.log("New data received:", {
+          id: latestId,
+          features: features,
+          predicted_humidity: predicted_humidity,
+          timestamp: new Date().toISOString(),
+        });
+
+        // Update state with new values, using nullish coalescing for safer number conversion
+        setWeatherParams({
+          Temperature: Number(features.Temperature ?? 0),
+          airflow: Number(features.airflow ?? 0),
+          altitude: Number(features.altitude ?? 0),
+          pressure: Number(features.pressure ?? 0),
+          wind_speed: Number(features.wind_speed ?? 0),
+          predicted_humidity: Number(predicted_humidity ?? 0),
+        });
+
+        // Force a UI refresh with the new timestamp
+        setLastUpdate(Date.now());
+        setLoading(false);
+
+        // Update high moisture areas with the new humidity value
         const areas = [
           {
             id: 1,
             location: "Location 1",
-            humidity: Math.max(0, newWeatherParams.predicted_humidity - 15),
-            potential: getPotential(newWeatherParams.predicted_humidity - 15),
-            status: getStatus(newWeatherParams.predicted_humidity - 15),
+            humidity: Math.max(0, Number(predicted_humidity ?? 0) - 15),
+            potential: getPotential(Number(predicted_humidity ?? 0) - 15),
+            status: getStatus(Number(predicted_humidity ?? 0) - 15),
             coordinates: { lat: 12.9716, lng: 77.5946 },
           },
           {
             id: 2,
             location: "Location 2",
-            humidity: Math.max(0, newWeatherParams.predicted_humidity - 20),
-            potential: getPotential(newWeatherParams.predicted_humidity - 20),
-            status: getStatus(newWeatherParams.predicted_humidity - 20),
+            humidity: Math.max(0, Number(predicted_humidity ?? 0) - 20),
+            potential: getPotential(Number(predicted_humidity ?? 0) - 20),
+            status: getStatus(Number(predicted_humidity ?? 0) - 20),
             coordinates: { lat: 13.0827, lng: 77.5877 },
           },
-          {
+        ];
+
+        // Add current location if available
+        if (currentLocation) {
+          areas.push({
             id: 3,
             location: "Current Location",
-            humidity: newWeatherParams.predicted_humidity,
-            potential: getPotential(newWeatherParams.predicted_humidity),
-            status: getStatus(newWeatherParams.predicted_humidity),
-            coordinates: currentLocation
-              ? {
-                  lat: currentLocation.latitude,
-                  lng: currentLocation.longitude,
-                }
-              : { lat: 0, lng: 0 },
-          },
-        ];
+            humidity: Number(predicted_humidity ?? 0),
+            potential: getPotential(Number(predicted_humidity ?? 0)),
+            status: getStatus(Number(predicted_humidity ?? 0)),
+            coordinates: {
+              lat: currentLocation.latitude,
+              lng: currentLocation.longitude,
+            },
+          });
+        }
+
         setHighMoistureAreas(areas);
-        setLoading(false);
       } catch (error) {
-        console.error("Error fetching weather data:", error);
+        console.error("Error processing Firebase update:", error);
+      }
+    };
+
+    // Set up real-time listener with error handling
+    try {
+      const unsubscribe = onValue(featuresRef, handleDataUpdate, (error) => {
+        console.error("Firebase listener error:", error);
         setLoading(false);
-      }
-    };
+      });
 
-    // Helper functions for potential and status
-    const getPotential = (humidity: number) => {
-      if (humidity > 65) return "Very High";
-      if (humidity > 45) return "High";
-      return "Low";
-    };
-
-    const getStatus = (humidity: number) => {
-      return humidity > 65 ? "Active Monitoring" : "Monitoring";
-    };
-
-    // Initial fetch
-    fetchAndUpdateData();
-
-    // Set up interval for periodic updates (every 5 seconds)
-    const updateInterval = setInterval(fetchAndUpdateData, 5000);
-
-    // Set up real-time listener for immediate updates
-    onValue(featuresRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        fetchAndUpdateData();
-      }
-    });
-
-    onValue(humidityRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        fetchAndUpdateData();
-      }
-    });
-
-    // Cleanup function
-    return () => {
-      if (locationWatcher) {
-        navigator.geolocation.clearWatch(locationWatcher);
-      }
-      clearInterval(updateInterval);
-      off(featuresRef);
-      off(humidityRef);
-    };
-  }, []);
+      // Cleanup
+      return () => {
+        mounted = false;
+        unsubscribe();
+      };
+    } catch (error) {
+      console.error("Error setting up Firebase listener:", error);
+      setLoading(false);
+    }
+  }, [currentLocation]); // Keep currentLocation as dependency
 
   // State for high moisture areas
   const [highMoistureAreas, setHighMoistureAreas] = useState([
@@ -337,7 +367,23 @@ export function AtmosphericMoisture() {
         <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
           <CardHeader>
             <CardTitle>Weather Parameters</CardTitle>
-            <CardDescription>Real-time atmospheric conditions</CardDescription>
+            <CardDescription>
+              Real-time atmospheric conditions
+              <span className="text-xs text-gray-500 ml-2">
+                Last updated: {new Date(lastUpdate).toLocaleTimeString()}
+              </span>
+              {locationError && (
+                <span className="text-xs text-red-500 block mt-1">
+                  {locationError}
+                </span>
+              )}
+              {currentLocation && (
+                <span className="text-xs text-green-500 block mt-1">
+                  Location: {currentLocation.latitude.toFixed(4)},{" "}
+                  {currentLocation.longitude.toFixed(4)}
+                </span>
+              )}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {loading ? (
@@ -353,7 +399,7 @@ export function AtmosphericMoisture() {
                     <Thermometer className="h-4 w-4 text-red-500" />
                     <span className="text-sm">Temperature</span>
                   </div>
-                  <span className="font-medium">
+                  <span className="font-medium" key={`temp-${lastUpdate}`}>
                     {formatNumber(weatherParams.Temperature)}°C
                   </span>
                 </div>
@@ -364,7 +410,7 @@ export function AtmosphericMoisture() {
                     <Cloud className="h-4 w-4 text-blue-500" />
                     <span className="text-sm">Predicted Humidity</span>
                   </div>
-                  <span className="font-medium">
+                  <span className="font-medium" key={`humidity-${lastUpdate}`}>
                     {formatNumber(weatherParams.predicted_humidity)}%
                   </span>
                 </div>
@@ -437,6 +483,11 @@ export function AtmosphericMoisture() {
                   {locationError}
                 </span>
               )}
+              {currentLocation && (
+                <span className="text-green-500 text-xs block mt-1">
+                  Current location detected
+                </span>
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -481,6 +532,7 @@ export function AtmosphericMoisture() {
                     {/* Current Location Marker */}
                     {currentLocation && window.google && (
                       <>
+                        {/* Main location marker */}
                         <Marker
                           position={{
                             lat: currentLocation.latitude,
@@ -488,15 +540,27 @@ export function AtmosphericMoisture() {
                           }}
                           icon={{
                             url: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
-                            scaledSize: {
-                              width: 32,
-                              height: 32,
-                            },
                           }}
                           title={`Current Location (${formatNumber(
                             weatherParams.predicted_humidity
                           )}% Humidity)`}
                         />
+                        {/* Pulsing circle effect */}
+                        <Circle
+                          center={{
+                            lat: currentLocation.latitude,
+                            lng: currentLocation.longitude,
+                          }}
+                          radius={100}
+                          options={{
+                            fillColor: "#2196F3",
+                            fillOpacity: 0.4,
+                            strokeColor: "#2196F3",
+                            strokeOpacity: 0.8,
+                            strokeWeight: 2,
+                          }}
+                        />
+                        {/* Larger monitoring radius */}
                         <Circle
                           center={{
                             lat: currentLocation.latitude,
@@ -505,9 +569,9 @@ export function AtmosphericMoisture() {
                           radius={1000}
                           options={{
                             fillColor: "#2196F3",
-                            fillOpacity: 0.2,
+                            fillOpacity: 0.1,
                             strokeColor: "#2196F3",
-                            strokeOpacity: 0.5,
+                            strokeOpacity: 0.3,
                             strokeWeight: 1,
                           }}
                         />

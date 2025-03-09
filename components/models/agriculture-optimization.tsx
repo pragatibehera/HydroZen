@@ -1,55 +1,228 @@
 "use client";
 
-import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Leaf, Cloud, Droplet, Sun, Wind, AlertTriangle, CheckCircle, BarChart2 } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import {
+  Sun,
+  Cloud,
+  CloudRain,
+  Droplets,
+  Thermometer,
+  Wind,
+  AlertTriangle,
+  Leaf,
+} from "lucide-react";
+import { database } from "@/lib/firebase";
+import { ref, onValue, off } from "firebase/database";
+
+interface SoilParameters {
+  soilType: string;
+  nitrogen: number;
+  phosphorus: number;
+  temperature: number;
+  humidity: number;
+  pressure: number;
+}
+
+interface WeatherForecast {
+  condition: "Sunny" | "Cloudy" | "Rainy";
+  temperature: number;
+  humidity: number;
+  pressure: number;
+  description: string;
+}
+
+interface FarmingAdvice {
+  type: "info" | "warning" | "alert";
+  message: string;
+  action: string;
+}
 
 export function AgricultureOptimization() {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  
-  const cropData = [
-    {
-      id: 1,
-      name: "Wheat",
-      area: "North Field",
-      moisture: 42,
-      status: "Optimal",
-      lastIrrigation: "2 days ago",
-      nextIrrigation: "Tomorrow"
-    },
-    {
-      id: 2,
-      name: "Corn",
-      area: "East Field",
-      moisture: 28,
-      status: "Needs Water",
-      lastIrrigation: "5 days ago",
-      nextIrrigation: "Today"
-    },
-    {
-      id: 3,
-      name: "Soybeans",
-      area: "South Field",
-      moisture: 38,
-      status: "Optimal",
-      lastIrrigation: "3 days ago",
-      nextIrrigation: "In 2 days"
-    },
-    {
-      id: 4,
-      name: "Rice",
-      area: "West Paddy",
-      moisture: 85,
-      status: "Excess Water",
-      lastIrrigation: "1 day ago",
-      nextIrrigation: "In 5 days"
+  const [soilParams, setSoilParams] = useState<SoilParameters>({
+    soilType: "Clay Loam",
+    nitrogen: 45,
+    phosphorus: 35,
+    temperature: 28,
+    humidity: 65,
+    pressure: 1013,
+  });
+
+  const [forecast, setForecast] = useState<WeatherForecast>({
+    condition: "Sunny",
+    temperature: 28,
+    humidity: 65,
+    pressure: 1013,
+    description: "Clear sky with moderate humidity",
+  });
+
+  const [farmingAdvice, setFarmingAdvice] = useState<FarmingAdvice[]>([]);
+
+  // Function to determine soil quality
+  const getSoilQuality = (nitrogen: number, phosphorus: number): string => {
+    const average = (nitrogen + phosphorus) / 2;
+    if (average > 60) return "Excellent";
+    if (average > 40) return "Good";
+    if (average > 20) return "Fair";
+    return "Poor";
+  };
+
+  // Function to get weather icon
+  const getWeatherIcon = (condition: WeatherForecast["condition"]) => {
+    switch (condition) {
+      case "Sunny":
+        return <Sun className="h-8 w-8 text-yellow-500" />;
+      case "Cloudy":
+        return <Cloud className="h-8 w-8 text-gray-500" />;
+      case "Rainy":
+        return <CloudRain className="h-8 w-8 text-blue-500" />;
     }
-  ];
+  };
+
+  // Function to generate farming advice based on weather and soil conditions
+  const generateAdvice = (
+    forecast: WeatherForecast,
+    soilParams: SoilParameters
+  ): FarmingAdvice[] => {
+    const advice: FarmingAdvice[] = [];
+
+    // Temperature-based advice
+    if (forecast.temperature > 35) {
+      advice.push({
+        type: "warning",
+        message: "High temperature alert",
+        action:
+          "Consider providing shade to sensitive crops and increase irrigation",
+      });
+    }
+
+    // Humidity-based advice
+    if (forecast.humidity > 80) {
+      advice.push({
+        type: "alert",
+        message: "High humidity conditions",
+        action: "Monitor for fungal diseases and ensure proper ventilation",
+      });
+    }
+
+    // Soil nutrient-based advice
+    if (soilParams.nitrogen < 30) {
+      advice.push({
+        type: "warning",
+        message: "Low nitrogen levels detected",
+        action: "Consider applying nitrogen-rich fertilizer",
+      });
+    }
+
+    // Weather condition specific advice
+    switch (forecast.condition) {
+      case "Rainy":
+        advice.push({
+          type: "info",
+          message: "Rain expected",
+          action: "Hold off on irrigation and protect sensitive crops",
+        });
+        break;
+      case "Sunny":
+        if (forecast.temperature > 30) {
+          advice.push({
+            type: "info",
+            message: "Strong sunlight expected",
+            action: "Ensure adequate irrigation and consider mulching",
+          });
+        }
+        break;
+    }
+
+    return advice;
+  };
+
+  // Mock data generation
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Update soil parameters with slight variations
+      setSoilParams((prev) => ({
+        ...prev,
+        temperature: Math.max(
+          20,
+          Math.min(40, prev.temperature + (Math.random() * 2 - 1))
+        ),
+        humidity: Math.max(
+          30,
+          Math.min(90, prev.humidity + (Math.random() * 4 - 2))
+        ),
+        pressure: Math.max(
+          990,
+          Math.min(1030, prev.pressure + (Math.random() * 4 - 2))
+        ),
+        nitrogen: Math.max(
+          0,
+          Math.min(100, prev.nitrogen + (Math.random() * 2 - 1))
+        ),
+        phosphorus: Math.max(
+          0,
+          Math.min(100, prev.phosphorus + (Math.random() * 2 - 1))
+        ),
+      }));
+
+      // Update weather forecast
+      const conditions: WeatherForecast["condition"][] = [
+        "Sunny",
+        "Cloudy",
+        "Rainy",
+      ];
+      const randomCondition =
+        conditions[Math.floor(Math.random() * conditions.length)];
+
+      setForecast((prev) => ({
+        ...prev,
+        condition: randomCondition,
+        temperature: Math.max(
+          20,
+          Math.min(40, prev.temperature + (Math.random() * 2 - 1))
+        ),
+        humidity: Math.max(
+          30,
+          Math.min(90, prev.humidity + (Math.random() * 4 - 2))
+        ),
+        pressure: Math.max(
+          990,
+          Math.min(1030, prev.pressure + (Math.random() * 4 - 2))
+        ),
+        description: getWeatherDescription(randomCondition),
+      }));
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Generate advice when parameters change
+  useEffect(() => {
+    const newAdvice = generateAdvice(forecast, soilParams);
+    setFarmingAdvice(newAdvice);
+  }, [forecast, soilParams]);
+
+  // Helper function to get weather description
+  const getWeatherDescription = (
+    condition: WeatherForecast["condition"]
+  ): string => {
+    switch (condition) {
+      case "Sunny":
+        return "Clear sky with good visibility";
+      case "Cloudy":
+        return "Overcast conditions expected";
+      case "Rainy":
+        return "Precipitation expected";
+    }
+  };
 
   return (
     <div className="space-y-6 p-5">
@@ -57,322 +230,149 @@ export function AgricultureOptimization() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <Leaf className="h-6 w-6 text-green-500" />
-            Agriculture Water Optimization
+            Agricultural Optimization System
           </h2>
           <p className="text-gray-500 dark:text-gray-400">
-            Optimize irrigation and water usage for agricultural operations
+            Real-time monitoring and smart farming recommendations
           </p>
         </div>
-        <Button className="bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600">
-          <Droplet className="mr-2 h-4 w-4" /> Schedule Irrigation
-        </Button>
       </div>
 
-      <Tabs defaultValue="dashboard" value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="bg-green-50 dark:bg-green-900/30 p-1">
-          <TabsTrigger value="dashboard" className="data-[state=active]:bg-white dark:data-[state=active]:bg-green-800">
-            Dashboard
-          </TabsTrigger>
-          <TabsTrigger value="fields" className="data-[state=active]:bg-white dark:data-[state=active]:bg-green-800">
-            Field Monitoring
-          </TabsTrigger>
-          <TabsTrigger value="forecast" className="data-[state=active]:bg-white dark:data-[state=active]:bg-green-800">
-            Weather Forecast
-          </TabsTrigger>
-          <TabsTrigger value="analytics" className="data-[state=active]:bg-white dark:data-[state=active]:bg-green-800">
-            Water Analytics
-          </TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="dashboard" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Current Conditions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Sun className="h-5 w-5 text-yellow-500" />
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Temperature</span>
-                  </div>
-                  <span className="font-medium">28°C</span>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Cloud className="h-5 w-5 text-blue-500" />
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Humidity</span>
-                  </div>
-                  <span className="font-medium">65%</span>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Wind className="h-5 w-5 text-blue-500" />
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Wind Speed</span>
-                  </div>
-                  <span className="font-medium">8 km/h</span>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Droplet className="h-5 w-5 text-blue-500" />
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Precipitation</span>
-                  </div>
-                  <span className="font-medium">0 mm</span>
-                </div>
-                
-                <Separator />
-                
-                <div className="pt-2">
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Soil Moisture (Average)</span>
-                    <span className="font-medium">48%</span>
-                  </div>
-                  <Progress value={48} className="h-2" />
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Irrigation Status</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                  <div className="flex gap-2 text-yellow-700 dark:text-yellow-500">
-                    <AlertTriangle className="h-5 w-5 flex-shrink-0" />
-                    <div className="text-sm">
-                      <p className="font-medium">Irrigation Needed</p>
-                      <p className="mt-1">East Field (Corn) requires irrigation today</p>
-                      <div className="mt-2">
-                        <Button variant="outline" size="sm" className="h-7 text-xs">Schedule Now</Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                  <div className="flex gap-2 text-red-700 dark:text-red-500">
-                    <AlertTriangle className="h-5 w-5 flex-shrink-0" />
-                    <div className="text-sm">
-                      <p className="font-medium">Excess Water Alert</p>
-                      <p className="mt-1">West Paddy (Rice) has excess water levels. Consider drainage.</p>
-                      <div className="mt-2">
-                        <Button variant="outline" size="sm" className="h-7 text-xs">View Details</Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Water Efficiency</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Current Efficiency</span>
-                  <span className="font-medium text-green-600 dark:text-green-400">78%</span>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Target Efficiency</span>
-                  <span className="font-medium">85%</span>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Water Saved</span>
-                  <span className="font-medium text-green-600 dark:text-green-400">12,450 L</span>
-                </div>
-                
-                <Separator />
-                
-                <div className="pt-2">
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Progress to Target</span>
-                    <span className="font-medium">78%</span>
-                  </div>
-                  <Progress value={78} className="h-2" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          
-          <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle>Crop Monitoring</CardTitle>
-              <CardDescription>Current status of all crops and fields</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200 dark:border-gray-700">
-                      <th className="text-left py-3 px-4 font-medium">Crop</th>
-                      <th className="text-left py-3 px-4 font-medium">Area</th>
-                      <th className="text-left py-3 px-4 font-medium">Soil Moisture</th>
-                      <th className="text-left py-3 px-4 font-medium">Status</th>
-                      <th className="text-left py-3 px-4 font-medium">Last Irrigation</th>
-                      <th className="text-left py-3 px-4 font-medium">Next Irrigation</th>
-                      <th className="text-left py-3 px-4 font-medium">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cropData.map((crop) => (
-                      <tr key={crop.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                        <td className="py-3 px-4">{crop.name}</td>
-                        <td className="py-3 px-4">{crop.area}</td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <Progress value={crop.moisture} className="h-2 w-24" />
-                            <span>{crop.moisture}%</span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <Badge variant={
-                            crop.status === "Optimal" 
-                              ? "outline" 
-                              : crop.status === "Needs Water"
-                              ? "default"
-                              : "destructive"
-                          } className={
-                            crop.status === "Optimal" 
-                              ? "text-green-500 border-green-200 dark:border-green-800"
-                              : crop.status === "Needs Water"
-                              ? "bg-yellow-500"
-                              : ""
-                          }>
-                            {crop.status}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="text-sm">{crop.lastIrrigation}</span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="text-sm">{crop.nextIrrigation}</span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <Button variant="outline" size="sm">Details</Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Soil Parameters Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Soil Parameters</CardTitle>
+            <CardDescription>
+              Current soil conditions and nutrients
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                <p className="text-sm text-gray-500">Soil Type</p>
+                <p className="text-xl font-bold">{soilParams.soilType}</p>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="fields" className="space-y-4">
-          <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle>Field Monitoring</CardTitle>
-              <CardDescription>Detailed view of all agricultural fields</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="aspect-video relative rounded-lg overflow-hidden bg-green-50 dark:bg-green-900/20 flex items-center justify-center">
-                <div className="text-center text-gray-500 dark:text-gray-400">
-                  <Leaf className="h-12 w-12 mx-auto mb-2 text-green-400 opacity-50" />
-                  <p>Interactive field map will be displayed here</p>
-                  <p className="text-sm mt-2">Google Maps integration required for production use</p>
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                <p className="text-sm text-gray-500">Soil Quality</p>
+                <p className="text-xl font-bold">
+                  {getSoilQuality(soilParams.nitrogen, soilParams.phosphorus)}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm text-gray-500">Nitrogen Level</span>
+                  <span className="font-medium">
+                    {soilParams.nitrogen.toFixed(1)}%
+                  </span>
                 </div>
-                
-                {/* Placeholder markers for fields */}
-                <div className="absolute top-1/4 left-1/3 h-16 w-16 rounded-full bg-green-500/20 animate-pulse flex items-center justify-center">
-                  <div className="h-8 w-8 rounded-full bg-green-500/40 flex items-center justify-center">
-                    <div className="h-4 w-4 rounded-full bg-green-500/60"></div>
-                  </div>
+                <Progress value={soilParams.nitrogen} className="h-2" />
+              </div>
+
+              <div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm text-gray-500">
+                    Phosphorus Level
+                  </span>
+                  <span className="font-medium">
+                    {soilParams.phosphorus.toFixed(1)}%
+                  </span>
                 </div>
-                
-                <div className="absolute bottom-1/3 right-1/4 h-12 w-12 rounded-full bg-yellow-500/20 animate-pulse flex items-center justify-center">
-                  <div className="h-6 w-6 rounded-full bg-yellow-500/40 flex items-center justify-center">
-                    <div className="h-3 w-3 rounded-full bg-yellow-500/60"></div>
-                  </div>
+                <Progress value={soilParams.phosphorus} className="h-2" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <p className="text-sm text-gray-500">Temperature</p>
+                <p className="text-lg font-bold flex items-center gap-1">
+                  <Thermometer className="h-4 w-4" />
+                  {soilParams.temperature.toFixed(1)}°C
+                </p>
+              </div>
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <p className="text-sm text-gray-500">Humidity</p>
+                <p className="text-lg font-bold flex items-center gap-1">
+                  <Droplets className="h-4 w-4" />
+                  {soilParams.humidity.toFixed(1)}%
+                </p>
+              </div>
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <p className="text-sm text-gray-500">Pressure</p>
+                <p className="text-lg font-bold flex items-center gap-1">
+                  <Wind className="h-4 w-4" />
+                  {soilParams.pressure.toFixed(1)} hPa
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Weather Forecast Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Weather Forecast</CardTitle>
+            <CardDescription>Current and expected conditions</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                {getWeatherIcon(forecast.condition)}
+                <div>
+                  <h3 className="text-lg font-bold">{forecast.condition}</h3>
+                  <p className="text-sm text-gray-500">
+                    {forecast.description}
+                  </p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="forecast" className="space-y-4">
-          <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle>7-Day Weather Forecast</CardTitle>
-              <CardDescription>AI-powered weather predictions for optimal irrigation planning</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
-                {Array.from({ length: 7 }).map((_, index) => (
-                  <Card key={index} className="border border-green-100 dark:border-green-800">
-                    <CardHeader className="pb-2 text-center">
-                      <CardTitle className="text-sm">{
-                        index === 0 ? "Today" : 
-                        index === 1 ? "Tomorrow" : 
-                        `Day ${index + 1}`
-                      }</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-center">
-                      {index === 0 ? (
-                        <Sun className="h-8 w-8 mx-auto text-yellow-500" />
-                      ) : index === 1 || index === 5 ? (
-                        <Cloud className="h-8 w-8 mx-auto text-blue-500" />
-                      ) : index === 2 ? (
-                        <Droplet className="h-8 w-8 mx-auto text-blue-500" />
-                      ) : (
-                        <Sun className="h-8 w-8 mx-auto text-yellow-500" />
-                      )}
-                      <div className="mt-2 font-medium">
-                        {index === 0 ? "28°C" : 
-                         index === 1 ? "26°C" : 
-                         index === 2 ? "24°C" : 
-                         index === 3 ? "27°C" : 
-                         index === 4 ? "29°C" : 
-                         index === 5 ? "25°C" : "28°C"}
-                      </div>
-                      <div className="mt-1 text-xs text-gray-500">
-                        {index === 0 ? "0% rain" : 
-                         index === 1 ? "20% rain" : 
-                         index === 2 ? "80% rain" : 
-                         index === 3 ? "10% rain" : 
-                         index === 4 ? "0% rain" : 
-                         index === 5 ? "30% rain" : "5% rain"}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+              <div className="text-2xl font-bold">
+                {forecast.temperature.toFixed(1)}°C
               </div>
-              
-              <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                <h3 className="font-medium mb-2 flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-blue-500" />
-                  AI Irrigation Recommendation
-                </h3>
-                <p className="text-sm">Based on the forecast, we recommend skipping irrigation today and scheduling it for Day 3 after the expected rainfall to maximize water efficiency.</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <p className="text-sm text-gray-500">Humidity</p>
+                <p className="text-lg font-bold">
+                  {forecast.humidity.toFixed(1)}%
+                </p>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="analytics" className="space-y-4">
-          <Card className="border-none bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle>Water Usage Analytics</CardTitle>
-              <CardDescription>Comprehensive analysis of your agricultural water consumption</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="aspect-video relative rounded-lg overflow-hidden bg-green-50 dark:bg-green-900/20 flex items-center justify-center">
-                <div className="text-center text-gray-500 dark:text-gray-400">
-                  <BarChart2 className="h-12 w-12 mx-auto mb-2 text-green-400 opacity-50" />
-                  <p>Detailed water usage analytics will be displayed here</p>
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <p className="text-sm text-gray-500">Pressure</p>
+                <p className="text-lg font-bold">
+                  {forecast.pressure.toFixed(1)} hPa
+                </p>
+              </div>
+            </div>
+
+            {/* Farming Advice Section */}
+            <div className="space-y-3">
+              <h3 className="font-medium">Farming Recommendations</h3>
+              {farmingAdvice.map((advice, index) => (
+                <div
+                  key={index}
+                  className={`p-3 rounded-lg flex items-start gap-2 ${
+                    advice.type === "warning"
+                      ? "bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20"
+                      : advice.type === "alert"
+                      ? "bg-red-50 text-red-700 dark:bg-red-900/20"
+                      : "bg-blue-50 text-blue-700 dark:bg-blue-900/20"
+                  }`}
+                >
+                  <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium">{advice.message}</p>
+                    <p className="text-sm mt-1">{advice.action}</p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

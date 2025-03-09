@@ -69,9 +69,9 @@ export function LeakageDetection() {
   const [loading, setLoading] = useState(true);
   const user = useUser();
   const { toast } = useToast();
-  const [node1Data, setNode1Data] = useState<NodeData | null>(null);
-  const [node2Data, setNode2Data] = useState<NodeData | null>(null);
-  const [nodeLoading, setNodeLoading] = useState(true);
+  const [node1Data, setNode1Data] = useState<NodeData>({ flow_rate: 2 });
+  const [node2Data, setNode2Data] = useState<NodeData>({ flow_rate: 2 });
+  const [nodeLoading, setNodeLoading] = useState(false);
   const [alerts, setAlerts] = useState<
     {
       type: "leak" | "system";
@@ -86,6 +86,23 @@ export function LeakageDetection() {
     if (typeof value !== "number") return "0.00";
     return value.toFixed(2);
   };
+
+  // Add mock data generation
+  useEffect(() => {
+    // Function to generate random number between 2 and 4
+    const generateRandomFlow = () => {
+      return Math.random() * 2 + 2; // Random number between 2 and 4
+    };
+
+    // Update mock data every second
+    const interval = setInterval(() => {
+      setNode1Data({ flow_rate: generateRandomFlow() });
+      setNode2Data({ flow_rate: generateRandomFlow() });
+    }, 1000);
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     async function fetchDashboardData() {
@@ -197,39 +214,6 @@ export function LeakageDetection() {
 
     fetchDashboardData();
   }, [user, toast]);
-
-  // Add Firebase listener for nodes
-  useEffect(() => {
-    const node1Ref = ref(
-      database,
-      "TransferredFeatures/-OKquAGqOgeRz1qYqMKY/features"
-    );
-    const node2Ref = ref(
-      database,
-      "TransferredFeatures/-OKquAGqOgeRz1qYqMKY/features2"
-    );
-
-    onValue(node1Ref, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        setNode1Data(data);
-      }
-    });
-
-    onValue(node2Ref, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        setNode2Data(data);
-      }
-    });
-
-    setNodeLoading(false);
-
-    return () => {
-      off(node1Ref);
-      off(node2Ref);
-    };
-  }, []);
 
   // Update node comparison logic
   useEffect(() => {
